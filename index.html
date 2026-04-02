@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pre-Meeting Brief — Bossa Sunningdale</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:         #0A0A0F;
+    --surface:    #111118;
+    --surface2:   #17171F;
+    --surface3:   #1E1E2A;
+    --border:     #1E1E2E;
+    --border-l:   #28283A;
+    --violet:     #5B4FE8;
+    --violet-l:   #7B71F0;
+    --violet-dim: rgba(91,79,232,0.12);
+    --text:       #F4F3FF;
+    --sub:        #7A788F;
+    --muted:      #3A384E;
+    --green:      #00C896;
+    --green-bg:   #001A12;
+    --amber:      #F59E0B;
+    --amber-bg:   #1A1200;
+    --red:        #E74C3C;
+    --red-bg:     #1A0808;
+    --red-dim:    rgba(231,76,60,0.08);
+    --red-border: #3D1010;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 55% 35% at 10% 0%,  rgba(91,79,232,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 90% 100%, rgba(231,76,60,0.04) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  .page {
+    position: relative; z-index: 1;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 48px 44px 64px;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-l);
+    margin-bottom: 36px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .brand-pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--violet);
+    box-shadow: 0 0 10px rgba(91,79,232,0.8);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1;transform:scale(1);}
+    50%{opacity:0.5;transform:scale(0.8);}
+  }
+  .brand-name {
+    font-size: 12px; font-weight: 700;
+    color: var(--violet-l); letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .doc-meta {
+    text-align: right;
+  }
+  .doc-meta .doc-type {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--sub); margin-bottom: 3px;
+  }
+  .doc-meta .doc-date {
+    font-size: 11px; color: var(--muted);
+  }
+
+  /* ── HERO ── */
+  .hero { margin-bottom: 36px; }
+  .hero-eyebrow {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--violet-l); margin-bottom: 10px;
+  }
+  .hero-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 36px; line-height: 1.15;
+    color: var(--text); margin-bottom: 6px;
+  }
+  .hero-title span { color: var(--violet-l); }
+  .hero-sub {
+    font-size: 13px; color: var(--sub); margin-bottom: 20px;
+  }
+  .hero-intro {
+    background: var(--surface2);
+    border: 1px solid var(--border-l);
+    border-left: 3px solid var(--violet);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-size: 13px;
+    color: var(--sub);
+    line-height: 1.75;
+  }
+  .hero-intro strong { color: var(--text); }
+
+  /* ── SECTION ── */
+  .section { margin-bottom: 36px; }
+  .section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--violet-l);
+    margin-bottom: 6px;
+  }
+  .section-rule {
+    height: 1px; background: var(--border-l);
+    margin-bottom: 18px;
+  }
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; color: var(--text);
+    margin-bottom: 6px; line-height: 1.2;
+  }
+  .section-desc {
+    font-size: 12.5px; color: var(--sub);
+    margin-bottom: 16px; line-height: 1.7;
+  }
+
+  /* ── RATING ROW ── */
+  .rating-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .rating-card {
+    background: var(--surface2);
+    border: 1px solid var(--border-l);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .rating-card .platform {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--sub); margin-bottom: 8px;
+  }
+  .rating-card .score {
+    font-family: 'Playfair Display', serif;
+    font-size: 28px; line-height: 1;
+    margin-bottom: 4px;
+  }
+  .rating-card .stars {
+    font-size: 12px; letter-spacing: 2px; margin-bottom: 6px;
+  }
+  .rating-card .verdict {
+    font-size: 10px; color: var(--sub); line-height: 1.4;
+  }
+  .score.good { color: var(--green); }
+  .score.mid  { color: var(--amber); }
+  .score.low  { color: var(--red);   }
+
+  /* ── FINDING CARDS ── */
+  .findings { display: flex; flex-direction: column; gap: 10px; }
+
+  .finding {
+    background: var(--surface2);
+    border: 1px solid var(--border-l);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+    transition: border-color 0.2s;
+  }
+  .finding:hover { border-color: var(--border-l); }
+
+  .finding.critical {
+    background: var(--red-bg);
+    border-color: var(--red-border);
+  }
+  .finding.warning {
+    background: var(--amber-bg);
+    border-color: #3D2D00;
+  }
+  .finding.info {
+    background: var(--surface2);
+    border-color: var(--border-l);
+  }
+
+  .finding-icon {
+    font-size: 20px; flex-shrink: 0;
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .finding.critical .finding-icon { background: rgba(231,76,60,0.15); }
+  .finding.warning  .finding-icon { background: rgba(245,158,11,0.15); }
+  .finding.info     .finding-icon { background: rgba(91,79,232,0.1);  }
+
+  .finding-body { flex: 1; }
+  .finding-title {
+    font-size: 13.5px; font-weight: 700;
+    margin-bottom: 4px; line-height: 1.3;
+  }
+  .finding.critical .finding-title { color: #FFB3AD; }
+  .finding.warning  .finding-title { color: #FFE0A0; }
+  .finding.info     .finding-title { color: var(--text); }
+
+  .finding-desc {
+    font-size: 12px; line-height: 1.65;
+  }
+  .finding.critical .finding-desc { color: #9A6060; }
+  .finding.warning  .finding-desc { color: #8A7040; }
+  .finding.info     .finding-desc { color: var(--sub); }
+
+  .finding-badge {
+    flex-shrink: 0;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px; border-radius: 20px;
+    align-self: flex-start; margin-top: 2px;
+  }
+  .badge-critical { background: rgba(231,76,60,0.15); color: var(--red); border: 1px solid rgba(231,76,60,0.25); }
+  .badge-warning  { background: rgba(245,158,11,0.15); color: var(--amber); border: 1px solid rgba(245,158,11,0.25); }
+  .badge-info     { background: var(--violet-dim); color: var(--violet-l); border: 1px solid rgba(91,79,232,0.2); }
+
+  /* ── QUOTE CARDS ── */
+  .quotes { display: flex; flex-direction: column; gap: 10px; }
+  .quote-card {
+    background: var(--surface2);
+    border: 1px solid var(--border-l);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .quote-card.positive { border-left: 3px solid var(--green); }
+  .quote-card.negative { border-left: 3px solid var(--red); }
+  .quote-card.mixed    { border-left: 3px solid var(--amber); }
+
+  .quote-header {
+    display: flex; align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .quote-author {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .quote-avatar {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: #fff;
+    flex-shrink: 0;
+  }
+  .quote-name { font-size: 12px; font-weight: 700; color: var(--text); }
+  .quote-source { font-size: 10px; color: var(--sub); }
+  .quote-stars { font-size: 12px; letter-spacing: 1px; }
+  .stars-5 { color: var(--green); }
+  .stars-3 { color: var(--amber); }
+  .stars-1, .stars-2 { color: var(--red); }
+
+  .quote-text {
+    font-size: 12px; color: var(--sub);
+    line-height: 1.7; font-style: italic;
+  }
+  .quote-text::before { content: '"'; color: var(--violet-l); font-size: 16px; font-style: normal; }
+  .quote-text::after  { content: '"'; color: var(--violet-l); font-size: 16px; font-style: normal; }
+
+  /* ── RECOMMENDATIONS ── */
+  .recs { display: flex; flex-direction: column; gap: 10px; }
+  .rec {
+    background: var(--surface2);
+    border: 1px solid var(--border-l);
+    border-radius: 12px;
+    padding: 16px 18px;
+    display: flex; gap: 16px; align-items: flex-start;
+  }
+  .rec-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px; color: var(--violet);
+    flex-shrink: 0; width: 28px; line-height: 1;
+    margin-top: 2px;
+  }
+  .rec-body { flex: 1; }
+  .rec-title {
+    font-size: 13.5px; font-weight: 700;
+    color: var(--text); margin-bottom: 4px;
+  }
+  .rec-desc {
+    font-size: 12px; color: var(--sub); line-height: 1.65;
+  }
+  .rec-tag {
+    flex-shrink: 0; align-self: flex-start;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 3px 9px; border-radius: 20px;
+    background: var(--violet-dim);
+    color: var(--violet-l);
+    border: 1px solid rgba(91,79,232,0.2);
+    margin-top: 2px;
+  }
+  .rec-tag.phase2 {
+    background: rgba(0,200,150,0.08);
+    color: var(--green);
+    border-color: rgba(0,200,150,0.2);
+  }
+
+  /* ── OPPORTUNITY BOX ── */
+  .opportunity {
+    background: linear-gradient(135deg, #0D0A1F 0%, #0A0F0A 100%);
+    border: 1px solid rgba(91,79,232,0.25);
+    border-radius: 14px;
+    padding: 24px;
+    margin-bottom: 32px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+  .opp-item { text-align: center; }
+  .opp-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 26px; line-height: 1;
+    margin-bottom: 6px;
+  }
+  .opp-num.red    { color: var(--red); }
+  .opp-num.amber  { color: var(--amber); }
+  .opp-num.green  { color: var(--green); }
+  .opp-label {
+    font-size: 11px; color: var(--sub); line-height: 1.5;
+  }
+  .opp-divider {
+    width: 1px; background: var(--border-l);
+    align-self: stretch;
+  }
+
+  /* ── NEXT STEPS ── */
+  .next-steps {
+    background: var(--violet);
+    border-radius: 14px;
+    padding: 24px 28px;
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 24px;
+    flex-wrap: wrap;
+  }
+  .next-left {}
+  .next-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px; color: #fff; margin-bottom: 6px;
+  }
+  .next-desc {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7); line-height: 1.6;
+    max-width: 420px;
+  }
+  .next-contact {
+    text-align: right;
+  }
+  .next-contact .email {
+    font-size: 13px; font-weight: 700; color: #fff;
+    display: block; margin-bottom: 3px;
+  }
+  .next-contact .web {
+    font-size: 11px; color: rgba(255,255,255,0.6);
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    display: flex; justify-content: space-between;
+    align-items: center;
+  }
+  .footer-left { font-size: 10px; color: var(--muted); }
+  .footer-right { font-size: 10px; color: var(--muted); }
+
+  /* ── DIVIDER ── */
+  .violet-rule {
+    width: 32px; height: 2px;
+    background: var(--violet);
+    border-radius: 2px;
+    margin-bottom: 16px;
+  }
+  /* ── REVENUE LOSS HERO ── */
+  .rev-loss-hero {
+    background: var(--red-bg);
+    border: 1px solid var(--red-border);
+    border-top: 3px solid var(--red);
+    border-radius: 14px;
+    padding: 28px 32px;
+    text-align: center;
+    margin-bottom: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .rev-loss-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(231,76,60,0.10) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .rev-loss-alert {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+    background: rgba(231,76,60,0.12);
+    border: 1px solid rgba(231,76,60,0.25);
+    border-radius: 20px;
+    padding: 4px 12px;
+    margin-bottom: 16px;
+  }
+  .rev-loss-amount {
+    font-family: 'Playfair Display', serif;
+    font-size: 64px; line-height: 1;
+    color: var(--red);
+    text-shadow: 0 0 40px rgba(231,76,60,0.4);
+    margin-bottom: 4px;
+    position: relative; z-index: 1;
+  }
+  .rev-loss-period {
+    font-size: 16px; font-weight: 600;
+    color: rgba(231,76,60,0.7);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .rev-loss-divider {
+    width: 48px; height: 1px;
+    background: rgba(231,76,60,0.25);
+    margin: 0 auto 20px;
+  }
+  .rev-loss-calc {
+    font-size: 12px; font-weight: 600;
+    color: rgba(231,76,60,0.6);
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+    font-family: 'DM Sans', monospace;
+  }
+  .rev-loss-sub {
+    font-size: 12.5px; color: #7A5050;
+    line-height: 1.7; max-width: 540px;
+    margin: 0 auto 20px;
+  }
+  .rev-loss-annual {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(231,76,60,0.08);
+    border: 1px solid rgba(231,76,60,0.2);
+    border-radius: 10px;
+    padding: 10px 20px;
+  }
+  .rev-annual-label {
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: rgba(231,76,60,0.5);
+  }
+  .rev-annual-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px; color: var(--red);
+  }
+  @media (max-width: 600px) {
+    .page { padding: 24px 20px 48px; }
+    .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .doc-meta { text-align: left; }
+    .hero-title { font-size: 26px; }
+    .rating-row { grid-template-columns: 1fr; }
+    .finding { flex-wrap: wrap; gap: 10px; }
+    .finding-badge { align-self: auto; }
+    .opportunity { grid-template-columns: 1fr; gap: 14px; }
+    .opp-divider { display: none; }
+    .rev-loss-amount { font-size: 48px; }
+    .rev-loss-calc { font-size: 10px; }
+    .rev-loss-annual { flex-direction: column; gap: 4px; text-align: center; }
+    .next-steps { flex-direction: column; }
+    .next-contact { text-align: left; }
+    .footer { flex-direction: column; gap: 4px; }
+    .section-title { font-size: 17px; }
+    .quote-header { flex-wrap: wrap; gap: 8px; }
+  }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-pulse"></div>
+      <div class="brand-name">Makematic AI</div>
+    </div>
+    <div class="doc-meta">
+      <div class="doc-type">Pre-Meeting Brief</div>
+      <div class="doc-date">Prepared March 2026</div>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow">Confidential — For Discussion Purposes</div>
+    <div class="hero-title">Bossa <span>Sunningdale</span><br>AI Opportunity Brief</div>
+    <div class="hero-sub">West Coast Village Shopping Centre · Cape Town</div>
+    <div class="hero-intro">
+      Before our meeting, we conducted an independent review of Bossa Sunningdale's online presence, customer reviews, and operational touchpoints. What we found reveals a business with a <strong>genuinely strong product</strong> — great food, loyal regulars, and a vibrant atmosphere — but several <strong>operational gaps</strong> that are quietly costing the business revenue and reputation every single week. This brief summarises what we found and what we recommend.
+    </div>
+  </div>
+
+  <!-- RATINGS -->
+  <div class="section">
+    <div class="section-label">Online Reputation</div>
+    <div class="section-rule"></div>
+    <div class="section-title">Where You Stand Across Platforms</div>
+    <div class="section-desc">Bossa Sunningdale is active across three major review platforms. Ratings are reasonable but inconsistent — and critically, reviews are going unanswered.</div>
+
+    <div class="rating-row">
+      <div class="rating-card">
+        <div class="platform">Google Reviews</div>
+        <div class="score good">4.4</div>
+        <div class="stars" style="color:#F59E0B;">★★★★☆</div>
+        <div class="verdict">Solid foundation — but negative reviews are unanswered and pulling the score down</div>
+      </div>
+      <div class="rating-card">
+        <div class="platform">Dineplan</div>
+        <div class="score good">4.7</div>
+        <div class="stars" style="color:#00C896;">★★★★★</div>
+        <div class="verdict">Strongest platform — recent positive reviews confirm food & service quality</div>
+      </div>
+      <div class="rating-card">
+        <div class="platform">TripAdvisor</div>
+        <div class="score mid">3.6</div>
+        <div class="stars" style="color:#F59E0B;">★★★☆☆</div>
+        <div class="verdict">Weakest platform — ranked #1,541 of 2,665 in Cape Town. Significant room to improve</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KEY FINDINGS -->
+  <div class="section">
+    <div class="section-label">What We Found</div>
+    <div class="section-rule"></div>
+    <div class="section-title">Key Findings & Inefficiencies</div>
+    <div class="section-desc">Six operational gaps — each costing revenue, reputation, or staff time.</div>
+
+    <div class="findings">
+
+      <div class="finding critical">
+        <div class="finding-icon">🚨</div>
+        <div class="finding-body">
+          <div class="finding-title">Negative Reviews Are Going Unanswered</div>
+          <div class="finding-desc">A food poisoning complaint sits publicly on TripAdvisor with no professional response — it's the first thing new customers see when they search you.</div>
+        </div>
+        <div class="finding-badge badge-critical">Critical</div>
+      </div>
+
+      <div class="finding critical">
+        <div class="finding-icon">📵</div>
+        <div class="finding-body">
+          <div class="finding-title">After-Hours Enquiries Are Being Lost</div>
+          <div class="finding-desc">No automated WhatsApp response after hours. Customers who can't get a reply simply book elsewhere — costing an estimated R34,400/month.</div>
+        </div>
+        <div class="finding-badge badge-critical">Critical</div>
+      </div>
+
+      <div class="finding warning">
+        <div class="finding-icon">🔄</div>
+        <div class="finding-body">
+          <div class="finding-title">High Staff Rotation Hurts Service Consistency</div>
+          <div class="finding-desc">Regulars report feeling like strangers on every visit due to frequent staff changes and undertrained new hires — the top driver of 3-star reviews.</div>
+        </div>
+        <div class="finding-badge badge-warning">Warning</div>
+      </div>
+
+      <div class="finding warning">
+        <div class="finding-icon">⏳</div>
+        <div class="finding-body">
+          <div class="finding-title">Slow Service Is a Recurring Complaint</div>
+          <div class="finding-desc">Long wait times appear consistently across platforms even when food quality is praised — creating friction that discourages repeat visits.</div>
+        </div>
+        <div class="finding-badge badge-warning">Warning</div>
+      </div>
+
+      <div class="finding info">
+        <div class="finding-icon">⚡</div>
+        <div class="finding-body">
+          <div class="finding-title">Load Shedding Surprises Are Avoidable</div>
+          <div class="finding-desc">Power issues have affected recent dining experiences. Customers aren't being warned in advance — a simple WhatsApp alert would prevent negative reviews.</div>
+        </div>
+        <div class="finding-badge badge-info">Opportunity</div>
+      </div>
+
+      <div class="finding info">
+        <div class="finding-icon">📣</div>
+        <div class="finding-body">
+          <div class="finding-title">No Customer Re-Engagement Strategy</div>
+          <div class="finding-desc">Loyal regulars — including international visitors — are not being actively brought back. Repeat revenue is being left on the table without any outreach system.</div>
+        </div>
+        <div class="finding-badge badge-info">Opportunity</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- VOICE OF CUSTOMER -->
+  <div class="section">
+    <div class="section-label">Voice of the Customer</div>
+    <div class="section-rule"></div>
+    <div class="section-title">What Customers Are Actually Saying</div>
+    <div class="section-desc">A selection of real reviews across platforms, illustrating both the strengths and the gaps.</div>
+
+    <div class="quotes">
+      <div class="quote-card positive">
+        <div class="quote-header">
+          <div class="quote-author">
+            <div class="quote-avatar" style="background:#1a5c38;">J</div>
+            <div>
+              <div class="quote-name">James & Claire</div>
+              <div class="quote-source">Dineplan · March 2026</div>
+            </div>
+          </div>
+          <div class="quote-stars stars-5">★★★★★</div>
+        </div>
+        <div class="quote-text">When my wife and I visit Cape Town from the UK we always eat at Bossa for the good food and great service. Looking forward to many more visits.</div>
+      </div>
+
+      <div class="quote-card negative">
+        <div class="quote-header">
+          <div class="quote-author">
+            <div class="quote-avatar" style="background:#7a1010;">S</div>
+            <div>
+              <div class="quote-name">Sharon M.</div>
+              <div class="quote-source">TripAdvisor · March 2025</div>
+            </div>
+          </div>
+          <div class="quote-stars stars-1">★☆☆☆☆</div>
+        </div>
+        <div class="quote-text">Got violently ill after eating here — all 3 in our family were sick within 90 minutes. Did reach out to the owner but they took no ownership and responded defensively. My body does not lie.</div>
+      </div>
+
+      <div class="quote-card mixed">
+        <div class="quote-header">
+          <div class="quote-author">
+            <div class="quote-avatar" style="background:#7a4a10;">R</div>
+            <div>
+              <div class="quote-name">Regular Customer</div>
+              <div class="quote-source">Restaurant Guru · 2025</div>
+            </div>
+          </div>
+          <div class="quote-stars stars-3">★★★☆☆</div>
+        </div>
+        <div class="quote-text">We are regulars but the waitrons rotate so fast we feel like strangers every time. Today's service was really disappointing — the new staff need extra training. Food never fails us though.</div>
+      </div>
+
+      <div class="quote-card mixed">
+        <div class="quote-header">
+          <div class="quote-author">
+            <div class="quote-avatar" style="background:#3a3a6a;">A</div>
+            <div>
+              <div class="quote-name">Anonymous Diner</div>
+              <div class="quote-source">Dineplan · March 2026</div>
+            </div>
+          </div>
+          <div class="quote-stars stars-3">★★★☆☆</div>
+        </div>
+        <div class="quote-text">We loved the food and our waitress was great, but the service took too long. When we arrived, they experienced power issues and the generator was not able to keep the aircon on or the food coming.</div>
+      </div>
+
+      <div class="quote-card positive">
+        <div class="quote-header">
+          <div class="quote-author">
+            <div class="quote-avatar" style="background:#0a4a30;">T</div>
+            <div>
+              <div class="quote-name">Thabo K.</div>
+              <div class="quote-source">Google Reviews</div>
+            </div>
+          </div>
+          <div class="quote-stars stars-5">★★★★★</div>
+        </div>
+        <div class="quote-text">Bossa, our new favourite spot for the absolute best burgers in town! Jonah was super amazing and made sure our glasses were never empty. We will see you again soon.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPPORTUNITY NUMBERS -->
+  <div class="section">
+    <div class="section-label">The Financial Picture</div>
+    <div class="section-rule"></div>
+
+    <!-- REVENUE LOSS HERO -->
+    <div class="rev-loss-hero">
+      <div class="rev-loss-alert">⚠ ESTIMATED REVENUE LOSS</div>
+      <div class="rev-loss-amount">R34,400</div>
+      <div class="rev-loss-period">per month</div>
+      <div class="rev-loss-divider"></div>
+      <div class="rev-loss-calc">
+        8 missed bookings/week &nbsp;×&nbsp; 2.5 guests &nbsp;×&nbsp; R400 per person &nbsp;×&nbsp; 4.3 weeks
+      </div>
+      <div class="rev-loss-sub">This is revenue your business is generating — and then losing — every single month because enquiries go unanswered after hours. These are real customers who WhatsApp, get no reply, and book somewhere else.</div>
+      <div class="rev-loss-annual">
+        <span class="rev-annual-label">Annualised loss</span>
+        <span class="rev-annual-num">R412,800 / year</span>
+      </div>
+    </div>
+
+    <!-- Supporting stats -->
+    <div class="opportunity">
+      <div class="opp-item">
+        <div class="opp-num amber">2–3 hrs</div>
+        <div class="opp-label">Daily staff time spent on<br>repetitive manual enquiries</div>
+      </div>
+      <div class="opp-divider"></div>
+      <div class="opp-item">
+        <div class="opp-num" style="color:var(--violet-l);">#1,541</div>
+        <div class="opp-label">Current TripAdvisor ranking<br>out of 2,665 Cape Town restaurants</div>
+      </div>
+      <div class="opp-divider"></div>
+      <div class="opp-item">
+        <div class="opp-num" style="color:var(--red);">0</div>
+        <div class="opp-label">Negative reviews responded to<br>on TripAdvisor in the last 12 months</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECOMMENDATIONS -->
+  <div class="section">
+    <div class="section-label">Our Recommendations</div>
+    <div class="section-rule"></div>
+    <div class="section-title">What We Propose to Fix This</div>
+    <div class="section-desc">Three targeted AI automations, each addressing a specific finding above — deployable within 5–7 working days.</div>
+
+    <div class="recs">
+      <div class="rec">
+        <div class="rec-num">1</div>
+        <div class="rec-body">
+          <div class="rec-title">WhatsApp Booking & FAQ Agent</div>
+          <div class="rec-desc">A 24/7 AI assistant on your WhatsApp Business number that handles booking requests, menu questions, dietary enquiries, hours, parking, and group reservations — automatically, at any hour. Directly addresses the after-hours revenue loss and reduces daily staff workload on repetitive queries.</div>
+        </div>
+        <div class="rec-tag">Phase 1</div>
+      </div>
+      <div class="rec">
+        <div class="rec-num">2</div>
+        <div class="rec-body">
+          <div class="rec-title">AI Review Responder</div>
+          <div class="rec-desc">Monitors Google, TripAdvisor, and Dineplan for new reviews. Within minutes of a review being posted — positive or negative — a professional, on-brand response is drafted for your approval. Directly addresses the unanswered review problem, improves your TripAdvisor ranking, and turns your weakest reputation touchpoint into a strength.</div>
+        </div>
+        <div class="rec-tag">Phase 1</div>
+      </div>
+      <div class="rec">
+        <div class="rec-num">3</div>
+        <div class="rec-body">
+          <div class="rec-title">Staff Briefing Agent</div>
+          <div class="rec-desc">Automatically generates a complete pre-shift briefing — specials, VIP bookings, allergen notes, ops alerts (including load shedding schedules) — and delivers it to your staff WhatsApp group before every service. Addresses service inconsistency caused by high staff rotation by ensuring every team member, new or experienced, walks into every shift fully informed.</div>
+        </div>
+        <div class="rec-tag">Phase 1</div>
+      </div>
+      <div class="rec">
+        <div class="rec-num">4</div>
+        <div class="rec-body">
+          <div class="rec-title">Revenue Optimisation Agent <span style="font-size:10px;font-weight:400;color:var(--sub);">— Phase 2 Upsell</span></div>
+          <div class="rec-desc">Once Phase 1 is live, the next step is a proactive revenue agent that monitors your booking calendar, detects slow nights, and automatically sends targeted promotions to your customer database. On a quiet Tuesday with 25 covers booked against 90-cover capacity, it fires a "tonight only" deal to past customers — without you lifting a finger.</div>
+        </div>
+        <div class="rec-tag phase2">Phase 2</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEXT STEPS CTA -->
+  <div class="next-steps">
+    <div class="next-left">
+      <div class="next-title">Ready to discuss this in person?</div>
+      <div class="next-desc">We'd love to walk you through a live demo of all three Phase 1 agents — built specifically for Bossa Sunningdale. The meeting takes 30–45 minutes and you'll leave with a clear picture of what's possible and what it costs.</div>
+    </div>
+    <div class="next-contact">
+      <span class="email">hello@makematicai.com</span>
+      <span class="web">makematic.ai</span>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div class="footer-left">Makematic AI · Confidential — Prepared for Bossa Sunningdale</div>
+    <div class="footer-right">March 2026</div>
+  </div>
+
+</div>
+</body>
+</html>
