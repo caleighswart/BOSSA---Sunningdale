@@ -1,0 +1,33 @@
+name: Bossa Sunningdale — Daily Stock Brief
+
+on:
+  # Runs every day at 06:00 SAST (04:00 UTC)
+  schedule:
+    - cron: '0 4 * * *'
+
+  # Also allows manual trigger from GitHub Actions tab (for testing)
+  workflow_dispatch:
+
+jobs:
+  send-brief:
+    name: Analyse stock & send Telegram brief
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r inventory/requirements.txt
+
+      - name: Run inventory agent
+        working-directory: inventory
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          PILOTLIVE_API_KEY:   ${{ secrets.PILOTLIVE_API_KEY }}
+        run: python main.py
