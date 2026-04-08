@@ -25,9 +25,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r inventory/requirements.txt
 
+      - name: Install Playwright browser
+        run: python -m playwright install chromium --with-deps
+
       - name: Run inventory agent
         working-directory: inventory
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          PILOTLIVE_API_KEY:   ${{ secrets.PILOTLIVE_API_KEY }}
+          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          PILOTLIVE_USERNAME:  ${{ secrets.PILOTLIVE_USERNAME }}
+          PILOTLIVE_PASSWORD:  ${{ secrets.PILOTLIVE_PASSWORD }}
         run: python main.py

@@ -13,11 +13,10 @@ RECIPIENTS = {
     # "sava": "TODO",                 # Add Sava's Telegram chat ID here
 }
 
-# ── PILOTLIVE API ─────────────────────────────────────────────────────────────
-# Set PILOTLIVE_API_KEY as a GitHub Secret once obtained from PilotLive support
-# Contact: support@pilot.co.za — request API access for Theoretical Stock On Hand
-PILOTLIVE_API_BASE = "https://api.pilotlive.co.za"   # TODO: confirm endpoint with PilotLive
-PILOTLIVE_OUTLET   = "Bossa Sunningdale"              # TODO: confirm outlet name/ID
+# ── PILOTLIVE CLOUD ───────────────────────────────────────────────────────────
+# Credentials stored as GitHub Secrets: PILOTLIVE_USERNAME, PILOTLIVE_PASSWORD
+# The agent logs into cloud.pilotlive.co.za and downloads the report automatically.
+# Set PILOTLIVE_DEBUG=1 locally to enable screenshots for troubleshooting.
 
 # ── SUPPLIERS ─────────────────────────────────────────────────────────────────
 # TODO: Fill in supplier details once confirmed with Sava

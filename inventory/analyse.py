@@ -34,22 +34,20 @@ def load_from_excel(path):
     return rows
 
 
-def load_from_api(api_key, outlet):
-    """
-    TODO: Implement PilotLive API call once credentials are available.
-    Contact support@pilot.co.za to request API access.
-    Expected return format: same list-of-dicts as load_from_excel().
-    """
-    raise NotImplementedError("PilotLive API integration pending — awaiting API key from support@pilot.co.za")
-
-
 def load_data():
-    """Load stock data from API if available, otherwise fall back to Excel."""
-    api_key = os.getenv("PILOTLIVE_API_KEY")
-    if api_key:
-        from config import PILOTLIVE_OUTLET
-        print("Using PilotLive API...")
-        return load_from_api(api_key, PILOTLIVE_OUTLET)
+    """
+    Load stock data from Pilot Cloud (if credentials available) or fall back to
+    the most recent Excel file in inventory/data/.
+    """
+    username = os.getenv("PILOTLIVE_USERNAME")
+    password = os.getenv("PILOTLIVE_PASSWORD")
+
+    if username and password:
+        from pilotcloud import download_stock_report
+        print("Logging into Pilot Cloud...")
+        path = download_stock_report(username, password)
+        print(f"Downloaded: {os.path.basename(path)}")
+        return load_from_excel(path)
 
     # Excel fallback — looks for most recent file in data/
     data_dir = os.path.join(os.path.dirname(__file__), "data")
@@ -58,7 +56,9 @@ def load_data():
         reverse=True
     )
     if not xlsx_files:
-        raise FileNotFoundError("No Excel file found in inventory/data/ and no PILOTLIVE_API_KEY set.")
+        raise FileNotFoundError(
+            "No Excel file found in inventory/data/ and PILOTLIVE_USERNAME/PASSWORD not set."
+        )
     path = os.path.join(data_dir, xlsx_files[0])
     print(f"Using Excel file: {xlsx_files[0]}")
     return load_from_excel(path)
