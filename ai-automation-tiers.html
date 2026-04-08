@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Automation Tiers — Makematic AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0A0A0F;
+    --surface:   #12121A;
+    --surface2:  #1A1A26;
+    --border:    #1E1E2E;
+    --border-l:  #2A2A3C;
+    --violet:    #5B4FE8;
+    --violet-l:  #7B71F0;
+    --text:      #F4F3FF;
+    --sub:       #7A788F;
+    --muted:     #3A384E;
+
+    --green:     #00C896;
+    --green-bg:  #001A12;
+    --green-b:   #003D28;
+
+    --amber:     #F59E0B;
+    --amber-bg:  #1A1200;
+    --amber-b:   #3D2D00;
+
+    --red:       #E74C3C;
+    --red-bg:    #1A0808;
+    --red-b:     #3D1010;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* ── ambient glow ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 50% 40% at 15% 0%,   rgba(91,79,232,0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 30% at 85% 100%,  rgba(0,200,150,0.04) 0%, transparent 65%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 48px 40px 56px;
+  }
+
+  /* ── header ── */
+  .page-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-l);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--violet);
+    box-shadow: 0 0 10px rgba(91,79,232,0.7);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50%      { opacity:0.5; transform:scale(0.8); }
+  }
+  .brand-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--violet-l);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .page-title-wrap { text-align: right; }
+  .page-eyebrow {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin-bottom: 5px;
+  }
+  .page-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .page-title span { color: var(--violet-l); }
+
+  /* ── intro ── */
+  .intro {
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto 44px;
+  }
+  .intro p {
+    font-size: 14px;
+    color: var(--sub);
+    line-height: 1.75;
+  }
+
+  /* ── three columns ── */
+  .tiers {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  /* ── tier card ── */
+  .tier {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border-l);
+    animation: fadeUp 0.5s ease both;
+  }
+  .tier:nth-child(1) { animation-delay: 0.05s; }
+  .tier:nth-child(2) { animation-delay: 0.15s; }
+  .tier:nth-child(3) { animation-delay: 0.25s; }
+
+  @keyframes fadeUp {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0); }
+  }
+
+  .tier-header {
+    padding: 22px 22px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tier-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    margin-bottom: 14px;
+  }
+  .tier-tag .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+
+  .tier-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    line-height: 1.2;
+    margin-bottom: 8px;
+  }
+  .tier-desc {
+    font-size: 12px;
+    color: var(--sub);
+    line-height: 1.6;
+  }
+
+  /* complexity indicator */
+  .complexity {
+    display: flex;
+    gap: 4px;
+    margin-top: 14px;
+  }
+  .complexity-bar {
+    height: 3px;
+    flex: 1;
+    border-radius: 2px;
+    background: var(--border-l);
+  }
+
+  /* ── item list ── */
+  .tier-items {
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: default;
+  }
+  .item:hover {
+    background: rgba(255,255,255,0.04);
+  }
+
+  .item-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    width: 22px;
+    text-align: center;
+  }
+  .item-text { flex: 1; }
+  .item-title {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    margin-bottom: 2px;
+  }
+  .item-desc {
+    font-size: 11px;
+    color: var(--sub);
+    line-height: 1.5;
+  }
+
+  /* ── tier colour themes ── */
+
+  /* GREEN — Simple */
+  .tier.simple {
+    background: var(--green-bg);
+    border-color: var(--green-b);
+  }
+  .tier.simple .tier-header { border-color: var(--green-b); }
+  .tier.simple .tier-tag {
+    background: rgba(0,200,150,0.1);
+    border: 1px solid rgba(0,200,150,0.25);
+    color: var(--green);
+  }
+  .tier.simple .tier-tag .dot { background: var(--green); }
+  .tier.simple .tier-name { color: var(--green); }
+  .tier.simple .complexity-bar.filled { background: var(--green); }
+  .tier.simple .item:hover { border-color: rgba(0,200,150,0.15); }
+  .tier.simple .item-title { color: #d0fff5; }
+
+  /* AMBER — Medium */
+  .tier.medium {
+    background: var(--amber-bg);
+    border-color: var(--amber-b);
+  }
+  .tier.medium .tier-header { border-color: var(--amber-b); }
+  .tier.medium .tier-tag {
+    background: rgba(245,158,11,0.1);
+    border: 1px solid rgba(245,158,11,0.25);
+    color: var(--amber);
+  }
+  .tier.medium .tier-tag .dot { background: var(--amber); }
+  .tier.medium .tier-name { color: var(--amber); }
+  .tier.medium .complexity-bar.filled { background: var(--amber); }
+  .tier.medium .item:hover { border-color: rgba(245,158,11,0.15); }
+  .tier.medium .item-title { color: #fff8e0; }
+
+  /* RED — Advanced */
+  .tier.advanced {
+    background: var(--red-bg);
+    border-color: var(--red-b);
+  }
+  .tier.advanced .tier-header { border-color: var(--red-b); }
+  .tier.advanced .tier-tag {
+    background: rgba(231,76,60,0.1);
+    border: 1px solid rgba(231,76,60,0.25);
+    color: var(--red);
+  }
+  .tier.advanced .tier-tag .dot { background: var(--red); }
+  .tier.advanced .tier-name { color: var(--red); }
+  .tier.advanced .complexity-bar.filled { background: var(--red); }
+  .tier.advanced .item:hover { border-color: rgba(231,76,60,0.15); }
+  .tier.advanced .item-title { color: #ffe0de; }
+
+  /* ── bossa callout ── */
+  .bossa-row {
+    margin-top: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border-l);
+    border-left: 3px solid var(--violet);
+    border-radius: 12px;
+    padding: 18px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .bossa-label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--violet-l);
+    white-space: nowrap;
+  }
+  .bossa-chips {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+  .bossa-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(91,79,232,0.1);
+    border: 1px solid rgba(91,79,232,0.2);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--violet-l);
+  }
+  .bossa-chip .chip-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--violet-l);
+  }
+  .bossa-note {
+    font-size: 11.5px;
+    color: var(--sub);
+    line-height: 1.5;
+  }
+
+  /* ── footer ── */
+  .page-footer {
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-left {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+  .footer-right {
+    font-size: 10px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="page-header">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div class="brand-name">Makematic AI</div>
+    </div>
+    <div class="page-title-wrap">
+      <div class="page-eyebrow">Prepared for Bossa Sunningdale</div>
+      <div class="page-title">AI Automation <span>Tiers</span></div>
+    </div>
+  </div>
+
+  <!-- INTRO -->
+  <div class="intro">
+    <p>Not all automations are created equal. Below is a breakdown of what's possible across three levels of complexity — from quick wins that can be live within days, to intelligent systems that replace entire operational roles.</p>
+  </div>
+
+  <!-- THREE TIERS -->
+  <div class="tiers">
+
+    <!-- ── SIMPLE ── -->
+    <div class="tier simple">
+      <div class="tier-header">
+        <div class="tier-tag"><div class="dot"></div> Simple</div>
+        <div class="tier-name">Quick Wins</div>
+        <div class="tier-desc">Single trigger, single action. Set up once and they run forever with minimal upkeep.</div>
+        <div class="complexity">
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar"></div>
+          <div class="complexity-bar"></div>
+          <div class="complexity-bar"></div>
+          <div class="complexity-bar"></div>
+        </div>
+      </div>
+      <div class="tier-items">
+        <div class="item">
+          <div class="item-icon">💬</div>
+          <div class="item-text">
+            <div class="item-title">WhatsApp FAQ Bot</div>
+            <div class="item-desc">Answers hours, parking, menu and dietary questions automatically</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📅</div>
+          <div class="item-text">
+            <div class="item-title">Booking Confirmation</div>
+            <div class="item-desc">Auto-sends confirmation + date, time, address after every reservation</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">⭐</div>
+          <div class="item-text">
+            <div class="item-title">Review Request Trigger</div>
+            <div class="item-desc">Sends "Leave us a Google review?" message 24hrs after a visit</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🎂</div>
+          <div class="item-text">
+            <div class="item-title">Birthday Greeting</div>
+            <div class="item-desc">Sends a personalised discount or message on a customer's birthday</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📢</div>
+          <div class="item-text">
+            <div class="item-title">Daily Specials Broadcast</div>
+            <div class="item-desc">Owner types today's special once — agent sends it to the customer list</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📋</div>
+          <div class="item-text">
+            <div class="item-title">Staff Shift Briefing</div>
+            <div class="item-desc">Generates and delivers a pre-shift brief to the staff WhatsApp group</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📞</div>
+          <div class="item-text">
+            <div class="item-title">Missed Call Auto-Reply</div>
+            <div class="item-desc">Fires a WhatsApp message if no one answers the restaurant phone</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MEDIUM ── -->
+    <div class="tier medium">
+      <div class="tier-header">
+        <div class="tier-tag"><div class="dot"></div> Medium</div>
+        <div class="tier-name">Smart Workflows</div>
+        <div class="tier-desc">Multi-step logic and light integrations. The agent makes decisions, not just responses.</div>
+        <div class="complexity">
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar"></div>
+          <div class="complexity-bar"></div>
+        </div>
+      </div>
+      <div class="tier-items">
+        <div class="item">
+          <div class="item-icon">🗓️</div>
+          <div class="item-text">
+            <div class="item-title">Full Booking Manager</div>
+            <div class="item-desc">Takes booking → confirms → sends 2hr reminder → follows up after visit</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">😤</div>
+          <div class="item-text">
+            <div class="item-title">Complaint Handling Workflow</div>
+            <div class="item-desc">Detects negative sentiment, escalates to manager, drafts a response</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🏅</div>
+          <div class="item-text">
+            <div class="item-title">Loyalty Points Tracker</div>
+            <div class="item-desc">Tracks customer visits via WhatsApp and rewards every 5th visit automatically</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📦</div>
+          <div class="item-text">
+            <div class="item-title">Supplier Order Assistant</div>
+            <div class="item-desc">Owner messages "order 20kg chicken" — agent sends structured order to supplier</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📊</div>
+          <div class="item-text">
+            <div class="item-title">Weekly Performance Report</div>
+            <div class="item-desc">Pulls review data and booking numbers into a weekly owner summary</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🧑‍🍳</div>
+          <div class="item-text">
+            <div class="item-title">Staff Scheduling Assistant</div>
+            <div class="item-desc">Staff submit availability, agent builds a draft schedule and sends to manager</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">💌</div>
+          <div class="item-text">
+            <div class="item-title">Re-Engagement Campaign</div>
+            <div class="item-desc">Sends "we miss you" promo to customers who haven't visited in 30+ days</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ADVANCED ── -->
+    <div class="tier advanced">
+      <div class="tier-header">
+        <div class="tier-tag"><div class="dot"></div> Advanced</div>
+        <div class="tier-name">Intelligent Systems</div>
+        <div class="tier-desc">Multi-system pipelines that think, adapt, and act — replacing significant manual roles.</div>
+        <div class="complexity">
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar filled"></div>
+          <div class="complexity-bar filled"></div>
+        </div>
+      </div>
+      <div class="tier-items">
+        <div class="item">
+          <div class="item-icon">📈</div>
+          <div class="item-text">
+            <div class="item-title">Revenue Optimisation Agent</div>
+            <div class="item-desc">Monitors covers, weather, and time — fires targeted promos automatically on slow nights</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">👤</div>
+          <div class="item-text">
+            <div class="item-title">Customer Relationship Agent</div>
+            <div class="item-desc">Tracks every touchpoint, builds customer profiles, personalises every interaction</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🏪</div>
+          <div class="item-text">
+            <div class="item-title">Multi-Branch Operations Hub</div>
+            <div class="item-desc">Aggregates data across all locations, flags issues, sends weekly owner briefing</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🤝</div>
+          <div class="item-text">
+            <div class="item-title">AI Hiring Assistant</div>
+            <div class="item-desc">Posts jobs, screens applicants via WhatsApp chat, shortlists candidates for review</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🧾</div>
+          <div class="item-text">
+            <div class="item-title">POS Integration Agent</div>
+            <div class="item-desc">Connects to the till system, tracks best sellers and slow movers, sends daily insights</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">📦</div>
+          <div class="item-text">
+            <div class="item-title">Predictive Inventory Agent</div>
+            <div class="item-desc">Forecasts stock needs based on bookings and historical sales patterns</div>
+          </div>
+        </div>
+        <div class="item">
+          <div class="item-icon">🎙️</div>
+          <div class="item-text">
+            <div class="item-title">Voice AI Agent</div>
+            <div class="item-desc">Answers the restaurant phone, takes bookings verbally, handles FAQs in natural speech</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOSSA CALLOUT -->
+  <div class="bossa-row">
+    <div class="bossa-label">Your Phase 1</div>
+    <div class="bossa-chips">
+      <div class="bossa-chip"><div class="chip-dot"></div>WhatsApp Booking & FAQ Agent</div>
+      <div class="bossa-chip"><div class="chip-dot"></div>Review Responder</div>
+      <div class="bossa-chip"><div class="chip-dot"></div>Staff Briefing Agent</div>
+    </div>
+    <div class="bossa-note">Starting with three Simple automations.<br>Medium and Advanced unlocked as you grow.</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="page-footer">
+    <div class="footer-left">Makematic AI · hello@makematicai.com · makematic.ai</div>
+    <div class="footer-right">Prepared for Bossa Sunningdale · Confidential</div>
+  </div>
+
+</div>
+</body>
+</html>
