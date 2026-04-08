@@ -25,11 +25,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r inventory/requirements.txt
 
-      - name: Install Playwright system dependencies
-        run: sudo apt-get install -y libasound2t64
-
       - name: Install Playwright browser
-        run: python -m playwright install chromium --with-deps
+        run: python -m playwright install chromium
+
+      - name: Install Playwright system dependencies
+        run: python -m playwright install-deps chromium
 
       - name: Run inventory agent
         working-directory: inventory
