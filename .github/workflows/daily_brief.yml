@@ -37,13 +37,4 @@ jobs:
           TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
           PILOTLIVE_USERNAME:  ${{ secrets.PILOTLIVE_USERNAME }}
           PILOTLIVE_PASSWORD:  ${{ secrets.PILOTLIVE_PASSWORD }}
-          PILOTLIVE_DEBUG:     "1"
-        run: python main.py || true
-
-      - name: Upload debug screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: pilotcloud-debug-screenshots
-          path: /tmp/pilotcloud_*.png
-          if-no-files-found: ignore
+        run: python main.py
