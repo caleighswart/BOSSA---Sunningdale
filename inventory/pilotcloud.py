@@ -2,7 +2,7 @@
 Bossa Sunningdale — Pilot Cloud Automated Login & Report Download
 =================================================================
 Uses a headless Chromium browser (Playwright) to log into
-cloud.pilotlive.co.za and download the Theoretical Stock On Hand
+cloud.pilot.co.za and download the Theoretical Stock On Hand
 Excel report for processing by the analysis engine.
 
 Credentials are read from environment variables:
@@ -15,7 +15,7 @@ import tempfile
 import time
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeoutError
 
-BASE_URL = "https://cloud.pilotlive.co.za"
+BASE_URL = "https://cloud.pilot.co.za"  # also accessible as app.pilotlive.co.za
 DEBUG    = os.getenv("PILOTLIVE_DEBUG", "").lower() in ("1", "true", "yes")
 
 
