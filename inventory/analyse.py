@@ -43,11 +43,15 @@ def load_data():
     password = os.getenv("PILOTLIVE_PASSWORD")
 
     if username and password:
-        from pilotcloud import download_stock_report
-        print("Logging into Pilot Cloud...")
-        path = download_stock_report(username, password)
-        print(f"Downloaded: {os.path.basename(path)}")
-        return load_from_excel(path)
+        try:
+            from pilotcloud import download_stock_report
+            print("Logging into Pilot Cloud...")
+            path = download_stock_report(username, password)
+            print(f"Downloaded: {os.path.basename(path)}")
+            return load_from_excel(path)
+        except Exception as e:
+            print(f"⚠️  Pilot Cloud download failed: {e}")
+            print("Falling back to most recent Excel file in data/...")
 
     # Excel fallback — looks for most recent file in data/
     data_dir = os.path.join(os.path.dirname(__file__), "data")
