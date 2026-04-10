@@ -25,12 +25,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r inventory/requirements.txt
 
-      - name: Install Playwright browser
-        run: python -m playwright install chromium
-
-      - name: Install Playwright system dependencies
-        run: python -m playwright install-deps chromium
-
       - name: Run inventory agent
         working-directory: inventory
         env:

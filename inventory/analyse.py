@@ -36,7 +36,7 @@ def load_from_excel(path):
 
 def load_data():
     """
-    Load stock data from Pilot Cloud (if credentials available) or fall back to
+    Load stock data from SSRS (if credentials available) or fall back to
     the most recent Excel file in inventory/data/.
     """
     username = os.getenv("PILOTLIVE_USERNAME")
@@ -44,13 +44,13 @@ def load_data():
 
     if username and password:
         try:
-            from pilotcloud import download_stock_report
-            print("Logging into Pilot Cloud...")
-            path = download_stock_report(username, password)
-            print(f"Downloaded: {os.path.basename(path)}")
-            return load_from_excel(path)
+            from pilotcloud import download_stock_data
+            print("Fetching live data from SSRS...")
+            rows, title = download_stock_data(username, password)
+            print(f"  Loaded {len(rows)} items — {title}")
+            return rows
         except Exception as e:
-            print(f"⚠️  Pilot Cloud download failed: {e}")
+            print(f"⚠️  SSRS download failed: {e}")
             print("Falling back to most recent Excel file in data/...")
 
     # Excel fallback — looks for most recent file in data/
