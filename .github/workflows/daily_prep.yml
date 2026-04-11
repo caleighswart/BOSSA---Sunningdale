@@ -1,0 +1,34 @@
+name: Bossa Sunningdale — Daily Prep List
+
+on:
+  # Runs every day at 08:00 SAST (06:00 UTC) — before morning prep session
+  schedule:
+    - cron: '0 6 * * *'
+
+  # Manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  send-prep-list:
+    name: Generate & send chef prep list
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r prep/requirements.txt
+
+      - name: Run prep bot
+        working-directory: prep
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          PILOTLIVE_USERNAME: ${{ secrets.PILOTLIVE_USERNAME }}
+          PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
+        run: python main.py
