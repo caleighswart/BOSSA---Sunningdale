@@ -10,7 +10,7 @@ Items are classified as:
   STOCKED  — at or above low par        (no action needed)
 """
 
-from config import PREP_ITEMS, EXCLUDE
+from prep_config import PREP_ITEMS, EXCLUDE
 
 
 def _total_soh(rows, cats):

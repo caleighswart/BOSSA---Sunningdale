@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from analyse import load_data
 from prep_engine import analyse_prep, build_prep_brief
-from config import CHEF_CHAT_ID, SERVICE_START, PREP_DEADLINE
+from prep_config import CHEF_CHAT_ID, SERVICE_START, PREP_DEADLINE
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8562498363:AAHVJRtFXbAdySE9TVEmpsBCF-gsTqSfNIs")
 
