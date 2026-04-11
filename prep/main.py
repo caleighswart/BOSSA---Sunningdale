@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Bossa Sunningdale — Prep Bot
-Sends the daily prep list to the head chef via Telegram.
-Run daily at 08:00 SAST via GitHub Actions (before morning prep session).
+Sends daily prep variance report to the head chef via Telegram.
+Run daily at 08:00 SAST via GitHub Actions.
 """
 
 import os
@@ -12,13 +12,11 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
 
-# Add inventory dir to path so we can reuse pilotcloud + analyse loaders
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "inventory"))
 sys.path.insert(0, os.path.dirname(__file__))
 
-from analyse import load_data
-from prep_engine import analyse_prep, build_prep_brief
-from prep_config import CHEF_CHAT_ID, SERVICE_START, PREP_DEADLINE
+from pilotfetch import fetch_variance_rows
+from prep_engine import analyse_variances, build_variance_brief
+from prep_config import CHEF_CHAT_ID
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8562498363:AAHVJRtFXbAdySE9TVEmpsBCF-gsTqSfNIs")
 
@@ -33,7 +31,6 @@ def get_dates():
 
 
 def send_telegram(chat_id, text):
-    """Send text to a Telegram chat, splitting at 4000 chars if needed."""
     chunks, current = [], ""
     for line in text.splitlines(keepends=True):
         if len(current) + len(line) > 4000:
@@ -60,7 +57,7 @@ def send_telegram(chat_id, text):
             with urllib.request.urlopen(req) as r:
                 resp = json.loads(r.read())
                 if resp.get("ok"):
-                    print(f"  [{i}/{len(chunks)}] ✅ sent to chat {chat_id}")
+                    print(f"  [{i}/{len(chunks)}] ✅ sent to {chat_id}")
                 else:
                     print(f"  [{i}/{len(chunks)}] ❌ Telegram error: {resp}")
         except urllib.error.HTTPError as e:
@@ -68,33 +65,30 @@ def send_telegram(chat_id, text):
 
 
 def main():
-    print(f"👨‍🍳 Bossa Sunningdale Prep Bot — {datetime.now(SAST).strftime('%a %-d %b %Y %H:%M SAST')}")
+    print(f"👨‍🍳 Bossa Prep Bot — {datetime.now(SAST).strftime('%a %-d %b %Y %H:%M SAST')}")
     print("─" * 60)
 
-    if CHEF_CHAT_ID == "TODO":
-        print("⚠️  CHEF_CHAT_ID is not set in prep/config.py")
-        print("   Ask the head chef to message the bot, then add their chat ID.")
+    username = os.getenv("PILOTLIVE_USERNAME")
+    password = os.getenv("PILOTLIVE_PASSWORD")
+    if not username or not password:
+        print("❌ PILOTLIVE_USERNAME / PILOTLIVE_PASSWORD not set")
         sys.exit(1)
 
     report_date, brief_date = get_dates()
     print(f"Report date: {report_date}  |  Brief date: {brief_date}")
 
-    print("\nLoading stock data from PilotLive...")
-    rows = load_data()
-    print(f"  {len(rows)} items loaded")
+    print("\nFetching variance data from PilotLive...")
+    rows, title = fetch_variance_rows(username, password)
+    print(f"  {len(rows)} items — {title}")
 
-    print("\nAnalysing prep requirements...")
-    urgent, today, stocked = analyse_prep(rows)
-    print(f"  {len(urgent)} urgent  |  {len(today)} today  |  {len(stocked)} stocked")
+    print("\nAnalysing prep variances...")
+    high, watch, clean = analyse_variances(rows)
+    print(f"  {len(high)} high  |  {len(watch)} watch  |  {len(clean)} on target")
 
-    print("\nBuilding prep list...")
-    brief = build_prep_brief(
-        urgent, today, stocked,
-        report_date, brief_date,
-        SERVICE_START, PREP_DEADLINE,
-    )
+    print("\nBuilding brief...")
+    brief = build_variance_brief(high, watch, clean, report_date, brief_date)
 
-    print(f"\nSending to head chef ({CHEF_CHAT_ID})...")
+    print(f"\nSending to chef ({CHEF_CHAT_ID})...")
     send_telegram(CHEF_CHAT_ID, brief)
 
     print("\n✅ Done!")
