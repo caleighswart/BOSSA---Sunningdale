@@ -93,10 +93,11 @@ def build_variance_brief(high, watch, clean, report_date, brief_date):
     if high:
         for e in high:
             direction = "over-used" if e["variance"] < 0 else "under-used"
+            detail = _it("{}, {:.0f}% off".format(direction, abs(e["pct"]) * 100))
             lines.append(
                 f"{_b(_nice(e['name']))} ({e['cat']}): "
                 f"{_sign(e['variance'])} vs theory "
-                f"({_it(f\"{direction}, {abs(e['pct'])*100:.0f}% off\")})"
+                f"({detail})"
             )
     else:
         lines.append("  None ✅")
@@ -106,10 +107,11 @@ def build_variance_brief(high, watch, clean, report_date, brief_date):
     if watch:
         for e in watch:
             direction = "over-used" if e["variance"] < 0 else "under-used"
+            detail = _it("{}, {:.0f}% off".format(direction, abs(e["pct"]) * 100))
             lines.append(
                 f"{_b(_nice(e['name']))} ({e['cat']}): "
                 f"{_sign(e['variance'])} "
-                f"({_it(f\"{direction}, {abs(e['pct'])*100:.0f}% off\")})"
+                f"({detail})"
             )
     else:
         lines.append("  None ✅")
