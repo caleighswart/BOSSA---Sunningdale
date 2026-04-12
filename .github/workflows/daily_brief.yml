@@ -26,6 +26,7 @@ jobs:
         run: pip install -r inventory/requirements.txt
 
       - name: Test SSRS connection
+        continue-on-error: true
         env:
           PILOTLIVE_USERNAME: ${{ secrets.PILOTLIVE_USERNAME }}
           PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
