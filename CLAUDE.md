@@ -6,14 +6,17 @@ This file gives any Claude agent full operational context for the Bossa Sunningd
 
 ## What This System Does
 
-Two GitHub Actions bots run automatically every morning:
+Three GitHub Actions bots run automatically every morning:
 
 | Bot | File | Time | Recipient |
 |-----|------|------|-----------|
 | **Inventory brief** | `inventory/main.py` | 06:00 SAST daily | Caleigh via Telegram |
+| **Bar stock brief** | `bar/main.py` | 07:00 SAST daily | Caleigh + bar manager via Telegram |
 | **Prep variance** | `prep/main.py` | 08:00 SAST daily | Chef via Telegram |
 
-Both bots pull live stock data from PilotLive's SSRS report server, analyse it, and send a formatted Telegram message.
+All three bots pull live stock data from PilotLive's SSRS report server, analyse it, and send a formatted Telegram message.
+
+The **bar bot** is product-specific — it uses per-SKU par levels from Sava's "Bar Bev Count 2025" spreadsheet (stored in `bar/pars.json`, 404 products), unlike the inventory bot which uses category-wide defaults. It classifies every alcohol/mixer SKU as critical/low/healthy against its own par level and also surfaces missing pars, variances, and new products added to PilotLive that Sava hasn't added to her count sheet yet.
 
 ---
 
@@ -23,8 +26,9 @@ Both bots pull live stock data from PilotLive's SSRS report server, analyse it, 
 |------|-------|-------|
 | PilotLive username | GitHub Secret + hardcoded reference | `0834436203` |
 | PilotLive password | **GitHub Secret only** — never local | `PILOTLIVE_PASSWORD` |
-| Telegram bot token | GitHub Secret + hardcoded fallback in `main.py` | `TELEGRAM_BOT_TOKEN` |
-| Caleigh's Telegram chat ID | `inventory/config.py` `RECIPIENTS` | `7399544281` |
+| Telegram bot token (inventory + prep) | GitHub Secret + hardcoded fallback in `main.py` | `TELEGRAM_BOT_TOKEN` |
+| Telegram bot token (bar bot — separate chat) | GitHub Secret only | `TELEGRAM_BAR_BOT_TOKEN` |
+| Caleigh's Telegram chat ID | `inventory/config.py` / `bar/config.py` `RECIPIENTS` | `7399544281` |
 | Sava's Telegram chat ID | `inventory/config.py` — not yet set | `TODO` |
 
 **GitHub Secrets location:** repo → Settings → Secrets and variables → Actions
@@ -36,7 +40,8 @@ Both bots pull live stock data from PilotLive's SSRS report server, analyse it, 
 ```
 .github/workflows/
   daily_brief.yml       — Inventory bot: 06:00 SAST (cron: 0 4 * * *)
-  daily_prep.yml        — Prep bot: 08:00 SAST (cron: 0 6 * * *)
+  daily_bar.yml         — Bar bot:       07:00 SAST (cron: 0 5 * * *)
+  daily_prep.yml        — Prep bot:      08:00 SAST (cron: 0 6 * * *)
 
 inventory/
   main.py               — Entrypoint: load → analyse → Telegram
@@ -45,6 +50,14 @@ inventory/
   config.py             — Par levels, groups, recipients, suppliers
   requirements.txt      — pandas, openpyxl, requests, requests-ntlm
   data/                 — Excel fallback files (most recent used if SSRS fails)
+
+bar/
+  main.py               — Entrypoint: load → match → analyse → Telegram
+  analyse.py            — Per-product par matching + brief builder
+  pilotfetch.py         — SSRS fetch (independent of inventory/prep)
+  config.py             — Recipients, categories, thresholds
+  pars.json             — 404 product → par mapping (from Sava's count sheet)
+  requirements.txt
 
 prep/
   main.py               — Entrypoint: fetch variances → Telegram
@@ -76,14 +89,35 @@ Authorization: NTLM (username=0834436203, password=from env)
 
 ---
 
-## Telegram Bot
+## Telegram Bots
 
-- **Bot name:** BossaSunningdaleBot
-- **Bot ID:** `8562498363`
-- **Token:** stored in `TELEGRAM_BOT_TOKEN` GitHub Secret; also hardcoded as fallback in `main.py`
-- **Test the bot is alive:** `GET https://api.telegram.org/bot{TOKEN}/getMe`
-- **Send a test message:** `POST https://api.telegram.org/bot{TOKEN}/sendMessage` with `{"chat_id":"7399544281","text":"test"}`
-- Messages use HTML parse mode; chunked at 4000 chars if brief is long
+Two separate Telegram bots so the bar brief arrives in its own chat,
+distinct from the inventory/prep brief chat.
+
+**Inventory + Prep bot:**
+- Bot name:   BossaSunningdaleBot
+- Bot ID:     `8562498363`
+- Token:      `TELEGRAM_BOT_TOKEN` GitHub Secret (hardcoded fallback in `inventory/main.py` and `prep/main.py`)
+- Used by:    `inventory/main.py` and `prep/main.py`
+
+**Bar bot:**
+- Bot name:   BossaBarBot (create via @BotFather — see setup below)
+- Token:      `TELEGRAM_BAR_BOT_TOKEN` GitHub Secret (no hardcoded fallback)
+- Used by:    `bar/main.py`
+
+**Setup for the bar bot (one-time):**
+1. In Telegram, open a chat with `@BotFather`.
+2. Send `/newbot`. Name it (e.g. "Bossa Bar Stock Bot"). BotFather gives you a token.
+3. Search for your new bot in Telegram and click "Start". This gives the bot permission to message you.
+4. In GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
+   - Name: `TELEGRAM_BAR_BOT_TOKEN`
+   - Value: the token BotFather gave you
+5. Trigger `daily_bar.yml` manually — brief arrives in the new chat.
+
+**Common commands:**
+- Test bot is alive:    `GET https://api.telegram.org/bot{TOKEN}/getMe`
+- Send test message:    `POST https://api.telegram.org/bot{TOKEN}/sendMessage` with `{"chat_id":"7399544281","text":"test"}`
+- All messages use HTML parse mode, chunked at 4000 chars.
 
 ---
 
@@ -130,13 +164,35 @@ The `send_telegram()` function catches errors silently (prints to log, doesn't r
 - Confirm par levels in `inventory/config.py` (all currently defaults)
 - Fill in supplier names, contacts, and WhatsApp numbers in `inventory/config.py`
 - Add chef's Telegram chat ID to `prep/prep_config.py` (currently uses Caleigh's for testing)
+- Add bar manager's Telegram chat ID to `RECIPIENTS` in `bar/config.py`
+- Fill in missing par levels for the 40 items flagged in the bar brief's "PAR MISSING" section (mix cocktails, Slo Jo syrups, glenfiddich/bushmills range, vapes, etc.)
 
 ---
 
 ## Modifying This System
 
-- **Change par levels:** edit `GROUPS` dict in `inventory/config.py`
-- **Add a recipient:** add `"name": "chat_id"` to `RECIPIENTS` in `inventory/config.py`
-- **Change send time:** edit cron in `.github/workflows/daily_brief.yml` (UTC — SAST is UTC+2)
+- **Change inventory par levels:** edit `GROUPS` dict in `inventory/config.py`
+- **Change bar par levels:** edit `bar/pars.json` (keys = PilotLive product names)
+- **Add a recipient:** add `"name": "chat_id"` to `RECIPIENTS` in relevant `config.py`
+- **Change send time:** edit cron in `.github/workflows/*.yml` (UTC — SAST is UTC+2)
 - **Add a prep category:** add to `PREP_CATEGORIES` in `prep/prep_config.py`
 - **Change variance thresholds:** edit `HIGH_VARIANCE_PCT` / `WATCH_VARIANCE_PCT` in `prep/prep_config.py`
+- **Change bar stock thresholds:** edit `CRITICAL_PCT` / `LOW_PCT` in `bar/config.py`
+
+---
+
+## Bar Bot — How It Works
+
+1. `bar/pilotfetch.py` pulls the SSRS XML report (same endpoint as inventory).
+2. `bar/analyse.py` infers which categories Sava tracks by scanning `pars.json` prefixes (`be-` → BEER, `wh-` → WHISKEY, etc.).
+3. For every PilotLive product in a tracked category, it looks up the matching par by normalised product name (lowercase, collapsed whitespace).
+4. It classifies each matched SKU as:
+   - 🔴 Critical (soh < 30% par)
+   - 🟡 Low (30–70% par)
+   - ✅ Healthy (≥70% par)
+   - ⚠️ Variance (soh < −5, likely count error)
+5. Unmatched products in well-tracked categories (≥3 par entries on Sava's sheet) appear under "🆕 NEW PRODUCTS — Add to bar count sheet".
+6. Par-sheet products with no par value appear under "❓ PAR MISSING — Set par levels".
+7. Brief is chunked on newline boundaries at 4000 chars and sent to every recipient in `bar/config.py` `RECIPIENTS`.
+
+**Updating bar pars:** open `bar/pars.json`, change the value for the product name, commit. Next run picks it up.

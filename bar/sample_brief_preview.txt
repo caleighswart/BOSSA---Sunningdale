@@ -1,0 +1,10 @@
+This file previously contained a sample brief generated from the
+2026-04-01 inventory/data snapshot. That snapshot is stale and no
+longer used — the bar bot now pulls live PilotLive data only.
+
+To see a live sample of the brief:
+  1. Push the new bar/ folder and .github/workflows/daily_bar.yml
+  2. Go to GitHub Actions → "Daily Bar Stock Brief"
+  3. Click "Run workflow" → Branch: main → Run workflow
+  4. After ~1 min, check Telegram for the real brief based on today's
+     live data.

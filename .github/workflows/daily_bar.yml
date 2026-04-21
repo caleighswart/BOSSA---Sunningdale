@@ -1,0 +1,60 @@
+name: Bossa Sunningdale — Daily Bar Stock Brief
+
+on:
+  # Runs every day at 07:00 SAST (05:00 UTC)
+  schedule:
+    - cron: '0 5 * * *'
+
+  # Manual trigger from the Actions tab (for testing)
+  workflow_dispatch:
+
+jobs:
+  send-bar-brief:
+    name: Analyse bar stock & send Telegram brief
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r bar/requirements.txt
+
+      - name: Test SSRS connection
+        continue-on-error: true
+        env:
+          PILOTLIVE_USERNAME: ${{ secrets.PILOTLIVE_USERNAME }}
+          PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
+        run: |
+          python3 - <<'EOF'
+          import os, sys, requests
+          from requests_ntlm import HttpNtlmAuth
+          u = os.environ.get("PILOTLIVE_USERNAME", "")
+          p = os.environ.get("PILOTLIVE_PASSWORD", "")
+          print(f"Username set: {bool(u)} | Password set: {bool(p)}")
+          url = "https://reports.pilotlive.co.za/ReportServer?%2fStock+Management%2fTheoretical+Stock+On+Hand&rs:Command=Render&rs:Format=XML&dclink=8689"
+          try:
+              r = requests.get(url, auth=HttpNtlmAuth(u, p), timeout=60)
+              print(f"SSRS status: {r.status_code} | Size: {len(r.content)} bytes")
+              if r.status_code != 200:
+                  print(f"Error body: {r.text[:500]}")
+                  sys.exit(1)
+              else:
+                  print("SSRS connection OK")
+          except Exception as e:
+              print(f"SSRS connection FAILED: {e}")
+              sys.exit(1)
+          EOF
+
+      - name: Run bar agent
+        working-directory: bar
+        env:
+          TELEGRAM_BAR_BOT_TOKEN: ${{ secrets.TELEGRAM_BAR_BOT_TOKEN }}
+          PILOTLIVE_USERNAME:     ${{ secrets.PILOTLIVE_USERNAME }}
+          PILOTLIVE_PASSWORD:     ${{ secrets.PILOTLIVE_PASSWORD }}
+        run: python main.py
