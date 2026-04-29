@@ -497,7 +497,7 @@ body {{
 
 .cat-cell  {{ font-size: 0.72rem; color: #9ca3af; font-weight: 500; width: 140px; white-space: nowrap; }}
 .name-cell {{ font-weight: 500; color: #111827; }}
-.num       {{ text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }}
+.num       {{ text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; width: 80px; }}
 .fill-col  {{ width: 165px; white-space: nowrap; }}
 
 /* Progress bar */
