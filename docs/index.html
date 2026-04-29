@@ -331,7 +331,7 @@ body {
   </div>
   <div class="header-right">
     <div class="date-main">29 April 2026</div>
-    <div class="date-sub">Updated 29 Apr 2026, 15:13 SAST</div>
+    <div class="date-sub">Updated 29 Apr 2026, 15:37 SAST</div>
   </div>
 </header>
 
@@ -599,23 +599,17 @@ body {
     const items    = JSON.parse(btn.dataset.items);
 
     const greeting = contact ? 'Hi ' + contact : 'Hi';
-    let msg = greeting + ', this is Bossa Sunningdale.
-
-Placing a bar stock order:
-
-';
+    let msg = greeting + ', this is Bossa Sunningdale.\n\nPlacing a bar stock order:\n\n';
 
     items.forEach(item => {
       const icon = item.status === 'CRITICAL'
         ? String.fromCodePoint(0x1F534)
         : String.fromCodePoint(0x1F7E1);
       msg += icon + ' ' + item.name + ' — order ' + item.needed +
-             ' (have ' + item.soh + ', par ' + item.par + ')
-';
+             ' (have ' + item.soh + ', par ' + item.par + ')\n';
     });
 
-    msg += '
-Please confirm availability and ETA. Thank you!';
+    msg += '\nPlease confirm availability and ETA. Thank you!';
 
     window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
   }
