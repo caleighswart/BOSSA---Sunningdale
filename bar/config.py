@@ -57,6 +57,35 @@ CATEGORY_ORDER = [
     "CBEV", "HBEV", "VAPES", "PACKAGING",
 ]
 
+# ── SUPPLIERS ─────────────────────────────────────────────────────────────────
+# One entry per category. If multiple categories share a supplier, give them
+# the same 'whatsapp' number — they will be merged into one order card.
+#
+# whatsapp: international format, digits only, no + or spaces (e.g. "27821234567")
+# contact:  rep's first name, used in the pre-filled WhatsApp message
+#
+# Leave name/contact/whatsapp as "" until you have the details — the Orders
+# tab will still show the products but the WhatsApp button won't appear.
+SUPPLIERS = {
+    "DRAUGHT":    {"name": "",  "contact": "",  "whatsapp": ""},
+    "BEER":       {"name": "",  "contact": "",  "whatsapp": ""},
+    "CIDER":      {"name": "",  "contact": "",  "whatsapp": ""},
+    "SWINE":      {"name": "",  "contact": "",  "whatsapp": ""},
+    "WWINE":      {"name": "",  "contact": "",  "whatsapp": ""},
+    "RWINE":      {"name": "",  "contact": "",  "whatsapp": ""},
+    "PORTSHERRY": {"name": "",  "contact": "",  "whatsapp": ""},
+    "WHISKEY":    {"name": "",  "contact": "",  "whatsapp": ""},
+    "BRANDY":     {"name": "",  "contact": "",  "whatsapp": ""},
+    "RUM":        {"name": "",  "contact": "",  "whatsapp": ""},
+    "WHITE SPIR": {"name": "",  "contact": "",  "whatsapp": ""},
+    "LIQUEUR":    {"name": "",  "contact": "",  "whatsapp": ""},
+    "PREMIX":     {"name": "",  "contact": "",  "whatsapp": ""},
+    "CBEV":       {"name": "",  "contact": "",  "whatsapp": ""},
+    "HBEV":       {"name": "",  "contact": "",  "whatsapp": ""},
+    "VAPES":      {"name": "",  "contact": "",  "whatsapp": ""},
+    "PACKAGING":  {"name": "",  "contact": "",  "whatsapp": ""},
+}
+
 # ── THRESHOLDS ────────────────────────────────────────────────────────────────
 # Mirrors inventory agent's thresholds so the chef/bar team see a consistent
 # escalation model. Stock on hand expressed as fraction of product's par.

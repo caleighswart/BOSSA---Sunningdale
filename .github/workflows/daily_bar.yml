@@ -13,6 +13,9 @@ jobs:
     name: Analyse bar stock & send Telegram brief
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write   # needed to push docs/index.html to the repo
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -58,3 +61,22 @@ jobs:
           PILOTLIVE_USERNAME:     ${{ secrets.PILOTLIVE_USERNAME }}
           PILOTLIVE_PASSWORD:     ${{ secrets.PILOTLIVE_PASSWORD }}
         run: python main.py
+
+      - name: Generate dashboard
+        working-directory: bar
+        env:
+          PILOTLIVE_USERNAME: ${{ secrets.PILOTLIVE_USERNAME }}
+          PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
+        run: python generate_dashboard.py
+
+      - name: Publish dashboard to GitHub Pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          if git diff --cached --quiet; then
+            echo "Dashboard unchanged — nothing to commit."
+          else
+            git commit -m "chore: update bar stock dashboard [skip ci]"
+            git push
+          fi
