@@ -750,17 +750,17 @@ body {{
     const items    = JSON.parse(btn.dataset.items);
 
     const greeting = contact ? 'Hi ' + contact : 'Hi';
-    let msg = greeting + ', this is Bossa Sunningdale.\n\nPlacing a bar stock order:\n\n';
+    let msg = greeting + ', this is Bossa Sunningdale.\\n\\nPlacing a bar stock order:\\n\\n';
 
     items.forEach(item => {{
       const icon = item.status === 'CRITICAL'
         ? String.fromCodePoint(0x1F534)
         : String.fromCodePoint(0x1F7E1);
       msg += icon + ' ' + item.name + ' \u2014 order ' + item.needed +
-             ' (have ' + item.soh + ', par ' + item.par + ')\n';
+             ' (have ' + item.soh + ', par ' + item.par + ')\\n';
     }});
 
-    msg += '\nPlease confirm availability and ETA. Thank you!';
+    msg += '\\nPlease confirm availability and ETA. Thank you!';
 
     window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
   }}
