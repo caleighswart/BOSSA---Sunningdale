@@ -1283,6 +1283,13 @@ async function waProcess(text) {
       })
     });
     const data = await res.json();
+    if (!res.ok) {
+      console.error('API error:', res.status, data);
+      typing.remove();
+      waAppendMsg('in', `API error ${res.status}: ${data?.error?.message || JSON.stringify(data)}`);
+      btn.disabled = false;
+      return;
+    }
     const reply = data.content?.[0]?.text || "Sorry, something went wrong — please try again! 😊";
     typing.remove();
     waAppendMsg('in', reply);
