@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write   # needed to push docs/index.html to the repo
+      contents: write   # needed to push docs/index.html so Netlify auto-deploys it
 
     steps:
       - name: Checkout repo
@@ -69,7 +69,7 @@ jobs:
           PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
         run: python generate_dashboard.py
 
-      - name: Publish dashboard to GitHub Pages
+      - name: Commit dashboard for Netlify deploy
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

@@ -1,7 +1,7 @@
 """
 Bossa Sunningdale — Bar Stock Dashboard Generator
 ===================================================
-Generates docs/index.html — a static GitHub Pages dashboard showing the
+Generates docs/index.html — a static Netlify dashboard showing the
 daily bar stock levels in a clean, professional format for managers and owners.
 
 Called by .github/workflows/daily_bar.yml after the bar agent runs.
