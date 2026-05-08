@@ -1,6 +1,6 @@
 ---
 name: dashboard-design
-description: Use when modifying bar/generate_dashboard.py, docs/index.html, or any visual styling of the bar stock dashboard. Applies the BOSSA Goodtimes visual identity (vintage hospitality, cream/black/yellow palette, slab-display headings) so the dashboard looks like an extension of the brand instead of a generic admin panel.
+description: Use when modifying bar/generate_dashboard.py, docs/index.html, or any visual styling of the bar stock dashboard. Applies the BOSSA palette (dark ink hero, cream canvas, yellow accent, semantic stock colors) and Inter typography so the dashboard reads as on-brand but professional — not a generic admin panel and not a heavy display-font marketing surface.
 ---
 
 # BOSSA Bar Dashboard — Design System
