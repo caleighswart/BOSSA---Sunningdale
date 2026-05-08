@@ -36,14 +36,14 @@ def _nice(name: str) -> str:
 def _pct_bar(pct: float) -> str:
     w = min(100, max(0, pct * 100))
     if pct < 0.30:
-        color = "#dc2626"
+        cls = "pb-fill-crit"
     elif pct < 0.70:
-        color = "#d97706"
+        cls = "pb-fill-low"
     else:
-        color = "#16a34a"
+        cls = "pb-fill-ok"
     return (
         f'<div class="pb-wrap">'
-        f'<div class="pb-fill" style="width:{w:.0f}%;background:{color}"></div>'
+        f'<div class="pb-fill {cls}" style="width:{w:.0f}%"></div>'
         f'</div>'
         f'<span class="pb-label">{pct * 100:.0f}%</span>'
     )
@@ -56,7 +56,7 @@ def _fmt(v: float) -> str:
 def _stock_table(rows: list, show_status: bool = False) -> str:
     """Render a list of (label, item[, status]) tuples as an HTML table."""
     if not rows:
-        return '<p class="empty">None — all good ✓</p>'
+        return '<p class="empty">Nothing to flag — looking good.</p>'
 
     cols = "<th>Category</th><th>Product</th><th class='num'>SOH</th><th class='num'>Par</th><th class='fill-col'>Fill</th>"
     if show_status:
@@ -145,7 +145,7 @@ def _orders_tab(supplier_groups: list) -> str:
     import json as _json
 
     if not supplier_groups:
-        return '<p class="empty">Nothing to order — all stock is healthy ✓</p>'
+        return '<p class="empty">Nothing to order — bar is well stocked.</p>'
 
     html = ""
     for g in supplier_groups:
@@ -303,7 +303,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
             )
         var_html += "</tbody></table>"
     else:
-        var_html = '<p class="empty">No variances detected ✓</p>'
+        var_html = '<p class="empty">No variances to investigate.</p>'
 
     # ── Admin tab ─────────────────────────────────────────────────────────────
     admin_html = ""
@@ -341,7 +341,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
         admin_html += "</tbody></table>"
 
     if not admin_html:
-        admin_html = '<p class="empty">No admin items ✓</p>'
+        admin_html = '<p class="empty">Nothing in admin — all set.</p>'
 
     # ── Orders tab ────────────────────────────────────────────────────────────
     supplier_groups = _build_supplier_groups(by_cat)
@@ -359,241 +359,285 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bossa Sunningdale — Bar Stock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+:root {{
+  --bossa-ink:        #1A1A1A;
+  --bossa-charcoal:   #33373D;
+  --bossa-muted:      #6b7280;
+  --bossa-cream:      #ECE6D6;
+  --bossa-cream-deep: #E0D8C2;
+  --bossa-card:       #FFFFFF;
+  --bossa-yellow:     #EDCD45;
+  --bossa-pink:       #CC3366;
+  --bossa-red:        #B91C1C;
+  --bossa-amber:      #B45309;
+  --bossa-green:      #15803D;
+  --body-font:        "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}}
+
 *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
 body {{
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
-  background: #f0f2f5;
-  color: #1f2937;
+  font-family: var(--body-font);
+  background: var(--bossa-cream);
+  color: var(--bossa-charcoal);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }}
 
-/* ── Header ─────────────────────────────────────────── */
+/* ── Hero band ────────────────────────────────────────── */
 .header {{
-  background: #111827;
+  background: var(--bossa-ink);
   padding: 1.4rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 0.75rem;
+  border-bottom: 3px solid var(--bossa-yellow);
 }}
 .header-left h1 {{
   color: #fff;
   font-size: 1.25rem;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }}
 .header-left p {{
-  color: #6b7280;
+  color: rgba(236, 230, 214, 0.6);
   font-size: 0.78rem;
-  margin-top: 0.2rem;
-  letter-spacing: 0.02em;
+  margin-top: 0.25rem;
+  font-weight: 500;
 }}
 .header-right {{ text-align: right; }}
-.header-right .date-main {{ color: #f9fafb; font-size: 0.95rem; font-weight: 600; }}
-.header-right .date-sub  {{ color: #6b7280; font-size: 0.72rem; margin-top: 0.15rem; }}
+.header-right .date-main {{ color: #fff; font-size: 0.95rem; font-weight: 600; }}
+.header-right .date-sub  {{ color: rgba(236, 230, 214, 0.55); font-size: 0.72rem; margin-top: 0.15rem; }}
 
 /* ── Summary bar ─────────────────────────────────────── */
 .summary-bar {{
-  background: #fff;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 1rem 2rem;
+  background: var(--bossa-card);
+  border-bottom: 1px solid var(--bossa-cream-deep);
+  padding: 1.1rem 2rem;
   display: flex;
   gap: 2.5rem;
   flex-wrap: wrap;
   align-items: center;
 }}
-.stat-value {{ font-size: 1.7rem; font-weight: 700; line-height: 1; }}
+.stat-value {{
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}}
 .stat-label {{
-  font-size: 0.65rem;
-  color: #9ca3af;
+  font-size: 0.66rem;
+  color: var(--bossa-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-top: 0.2rem;
+  font-weight: 600;
+  margin-top: 0.25rem;
 }}
-.s-crit .stat-value {{ color: #dc2626; }}
-.s-low  .stat-value {{ color: #d97706; }}
-.s-ok   .stat-value {{ color: #16a34a; }}
-.s-val  .stat-value {{ color: #111827; }}
-.divider {{ width: 1px; height: 2.2rem; background: #e5e7eb; }}
+.s-crit .stat-value {{ color: var(--bossa-red); }}
+.s-low  .stat-value {{ color: var(--bossa-amber); }}
+.s-ok   .stat-value {{ color: var(--bossa-green); }}
+.s-val  .stat-value {{ color: var(--bossa-ink); }}
+.divider {{ width: 1px; height: 2.2rem; background: var(--bossa-cream-deep); }}
 
 /* ── Tab nav ─────────────────────────────────────────── */
 .tab-nav {{
-  background: #fff;
-  border-bottom: 2px solid #e5e7eb;
+  background: var(--bossa-card);
+  border-bottom: 2px solid var(--bossa-cream-deep);
   padding: 0 2rem;
   display: flex;
   overflow-x: auto;
 }}
 .tab-btn {{
+  font-family: inherit;
   padding: 0.85rem 1.2rem;
   border: none;
   background: none;
-  font-size: 0.85rem;
+  font-size: 0.86rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--bossa-muted);
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
   white-space: nowrap;
   transition: color 0.15s, border-color 0.15s;
 }}
-.tab-btn:hover {{ color: #374151; }}
-.tab-btn.active {{ color: #111827; border-bottom-color: #111827; font-weight: 600; }}
+.tab-btn:hover {{ color: var(--bossa-charcoal); }}
+.tab-btn.active {{
+  color: var(--bossa-ink);
+  border-bottom-color: var(--bossa-yellow);
+  font-weight: 600;
+}}
 .tab-btn .count {{
   display: inline-block;
-  margin-left: 0.35rem;
-  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.5rem;
   border-radius: 9999px;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
   line-height: 1.6;
 }}
-.c-crit {{ background: #fef2f2; color: #dc2626; }}
-.c-low  {{ background: #fffbeb; color: #d97706; }}
-.c-var  {{ background: #f5f3ff; color: #7c3aed; }}
-.c-all  {{ background: #f3f4f6; color: #374151; }}
+.c-crit  {{ background: #fdecec; color: var(--bossa-red); }}
+.c-low   {{ background: #fbf0e1; color: var(--bossa-amber); }}
+.c-var   {{ background: #fbe7ee; color: var(--bossa-pink); }}
+.c-all   {{ background: var(--bossa-cream); color: var(--bossa-charcoal); }}
+.c-order {{ background: #fbf3cc; color: #6b5310; }}
 
-/* ── Content ─────────────────────────────────────────── */
+/* ── Content ──────────────────────────────────────────── */
 .content {{
-  max-width: 1140px;
+  max-width: 1180px;
   margin: 1.5rem auto;
   padding: 0 1.5rem;
 }}
 .tab-pane        {{ display: none; }}
 .tab-pane.active {{ display: block; }}
 
-/* ── Tables ──────────────────────────────────────────── */
+/* ── Tables ───────────────────────────────────────────── */
 .stock-table {{
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
-  border-radius: 0.5rem;
+  background: var(--bossa-card);
+  border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-  font-size: 0.865rem;
+  box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06), 0 1px 2px rgba(26, 26, 26, 0.04);
+  font-size: 0.875rem;
 }}
 .stock-table thead th {{
-  background: #f9fafb;
-  padding: 0.6rem 1rem;
+  background: #faf7ee;
+  padding: 0.65rem 1rem;
   text-align: left;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #9ca3af;
-  border-bottom: 1px solid #e5e7eb;
+  color: var(--bossa-muted);
+  border-bottom: 1px solid var(--bossa-cream-deep);
 }}
+.stock-table thead th.num,
+.stock-table thead th.fill-col {{ text-align: center; }}
 .stock-table td {{
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid #f3f4f6;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid #f4eedd;
   vertical-align: middle;
+  color: var(--bossa-charcoal);
 }}
 .stock-table tbody tr:last-child td {{ border-bottom: none; }}
-.stock-table tbody tr:hover {{ background: #fafafa; }}
+.stock-table tbody tr:hover {{ background: #fdfaf1; }}
 
-.cat-cell  {{ font-size: 0.72rem; color: #9ca3af; font-weight: 500; width: 140px; white-space: nowrap; }}
-.name-cell {{ font-weight: 500; color: #111827; }}
-.num       {{ text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; width: 80px; }}
-.fill-col  {{ width: 165px; white-space: nowrap; }}
+.cat-cell  {{ font-size: 0.74rem; color: var(--bossa-muted); font-weight: 500; width: 140px; white-space: nowrap; }}
+.name-cell {{ font-weight: 500; color: var(--bossa-ink); }}
+.num       {{ text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; width: 80px; font-weight: 600; color: var(--bossa-ink); }}
+.fill-col  {{ width: 170px; white-space: nowrap; text-align: center; }}
 
 /* Progress bar */
 .pb-wrap {{
   display: inline-block;
   width: 88px;
   height: 6px;
-  background: #e5e7eb;
+  background: var(--bossa-cream-deep);
   border-radius: 3px;
   overflow: hidden;
   vertical-align: middle;
   margin-right: 0.4rem;
 }}
-.pb-fill  {{ height: 100%; border-radius: 3px; }}
-.pb-label {{ font-size: 0.75rem; color: #374151; font-variant-numeric: tabular-nums; vertical-align: middle; }}
+.pb-fill       {{ height: 100%; border-radius: 3px; }}
+.pb-fill-crit  {{ background: var(--bossa-red); }}
+.pb-fill-low   {{ background: var(--bossa-amber); }}
+.pb-fill-ok    {{ background: var(--bossa-green); }}
+.pb-label    {{
+  font-size: 0.75rem;
+  color: var(--bossa-charcoal);
+  font-variant-numeric: tabular-nums;
+  vertical-align: middle;
+  font-weight: 600;
+}}
 
 /* Left-border status stripe */
-.row-critical td:first-child {{ border-left: 3px solid #dc2626; }}
-.row-low      td:first-child {{ border-left: 3px solid #d97706; }}
-.row-healthy  td:first-child {{ border-left: 3px solid #16a34a; }}
-.row-variance td:first-child {{ border-left: 3px solid #7c3aed; }}
+.row-critical td:first-child {{ border-left: 3px solid var(--bossa-red); }}
+.row-low      td:first-child {{ border-left: 3px solid var(--bossa-amber); }}
+.row-healthy  td:first-child {{ border-left: 3px solid var(--bossa-green); }}
+.row-variance td:first-child {{ border-left: 3px solid var(--bossa-pink); }}
 
 /* Status pills */
 .pill {{
   display: inline-block;
-  padding: 0.18rem 0.55rem;
+  padding: 0.18rem 0.6rem;
   border-radius: 9999px;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 600;
 }}
-.pill-critical {{ background: #fef2f2; color: #dc2626; }}
-.pill-low      {{ background: #fffbeb; color: #d97706; }}
-.pill-healthy  {{ background: #f0fdf4; color: #16a34a; }}
-.pill-variance {{ background: #f5f3ff; color: #7c3aed; }}
+.pill-critical {{ background: #fdecec; color: var(--bossa-red); }}
+.pill-low      {{ background: #fbf0e1; color: var(--bossa-amber); }}
+.pill-healthy  {{ background: #e8f5ec; color: var(--bossa-green); }}
+.pill-variance {{ background: #fbe7ee; color: var(--bossa-pink); }}
 
 /* ── Admin tab ───────────────────────────────────────── */
 .section-title {{
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 600;
-  color: #111827;
-  margin-bottom: 0.5rem;
+  color: var(--bossa-ink);
+  margin-bottom: 0.55rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
 }}
 .badge {{
   display: inline-block;
-  padding: 0.15rem 0.55rem;
+  padding: 0.15rem 0.6rem;
   border-radius: 9999px;
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   font-weight: 700;
 }}
-.badge-warn {{ background: #fffbeb; color: #d97706; }}
-.badge-info {{ background: #eff6ff; color: #2563eb; }}
+.badge-warn {{ background: #fbf0e1; color: var(--bossa-amber); }}
+.badge-info {{ background: #fbe7ee; color: var(--bossa-pink); }}
 .admin-note {{
-  font-size: 0.78rem;
-  color: #9ca3af;
+  font-size: 0.82rem;
+  color: var(--bossa-muted);
   margin-bottom: 0.75rem;
 }}
 .admin-list {{
   list-style: none;
-  background: #fff;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  background: var(--bossa-card);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06);
   overflow: hidden;
-  font-size: 0.84rem;
+  font-size: 0.86rem;
 }}
 .admin-list li {{
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid #f3f4f6;
-  color: #374151;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid #f4eedd;
+  color: var(--bossa-charcoal);
 }}
 .admin-list li:last-child {{ border-bottom: none; }}
-.admin-list li.more {{ color: #9ca3af; font-style: italic; }}
+.admin-list li.more {{ color: var(--bossa-muted); font-style: italic; }}
 
 .empty {{
   text-align: center;
   padding: 3rem 1rem;
-  color: #9ca3af;
-  font-size: 0.875rem;
-  background: #fff;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  color: var(--bossa-muted);
+  font-size: 0.9rem;
+  background: var(--bossa-card);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06);
 }}
 
 /* ── Orders tab ─────────────────────────────────────── */
 .supplier-card {{
-  background: #fff;
-  border-radius: 0.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+  background: var(--bossa-card);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06), 0 1px 2px rgba(26, 26, 26, 0.04);
   margin-bottom: 1.25rem;
   overflow: hidden;
 }}
 .supplier-header {{
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--bossa-cream-deep);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -601,22 +645,23 @@ body {{
   flex-wrap: wrap;
 }}
 .supplier-name {{
-  font-size: 0.95rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--bossa-ink);
   margin-bottom: 0.3rem;
 }}
 .supplier-meta {{
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
-  font-size: 0.78rem;
-  color: #6b7280;
+  font-size: 0.8rem;
+  color: var(--bossa-muted);
 }}
 .supplier-meta span {{ white-space: nowrap; }}
-.supplier-contact {{ color: #374151; font-weight: 500; }}
-.supplier-wa      {{ color: #374151; }}
-.supplier-cats    {{ color: #9ca3af; font-style: italic; }}
+.supplier-contact {{ color: var(--bossa-charcoal); font-weight: 500; }}
+.supplier-wa      {{ color: var(--bossa-charcoal); }}
+.supplier-cats    {{ color: var(--bossa-muted); font-style: italic; }}
+.unset {{ color: var(--bossa-muted); font-style: italic; font-weight: 400; }}
 .supplier-actions {{
   display: flex;
   flex-direction: column;
@@ -624,55 +669,61 @@ body {{
   gap: 0.5rem;
 }}
 .supplier-badges {{ display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: flex-end; }}
-.badge-crit {{ background: #fef2f2; color: #dc2626; }}
-.badge-low  {{ background: #fffbeb; color: #d97706; }}
+.badge-crit {{ background: #fdecec; color: var(--bossa-red); }}
+.badge-low  {{ background: #fbf0e1; color: var(--bossa-amber); }}
 .order-btn {{
+  font-family: inherit;
   display: inline-block;
-  padding: 0.5rem 1rem;
-  background: #16a34a;
-  color: #fff;
+  padding: 0.55rem 1.1rem;
+  background: var(--bossa-ink);
+  color: var(--bossa-yellow);
   border: none;
-  border-radius: 0.4rem;
-  font-size: 0.82rem;
+  border-radius: 6px;
+  font-size: 0.84rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }}
-.order-btn:hover {{ background: #15803d; }}
+.order-btn:hover {{ background: var(--bossa-yellow); color: var(--bossa-ink); }}
 .order-btn-unset {{
   display: inline-block;
-  padding: 0.35rem 0.75rem;
-  background: #f3f4f6;
-  color: #9ca3af;
-  border-radius: 0.4rem;
-  font-size: 0.72rem;
+  padding: 0.4rem 0.8rem;
+  background: var(--bossa-cream);
+  color: var(--bossa-muted);
+  border-radius: 6px;
+  font-size: 0.74rem;
+  font-style: italic;
   white-space: nowrap;
 }}
-.order-tbl .order-qty {{
-  font-weight: 700;
-  color: #111827;
+.order-tbl .order-qty {{ font-weight: 700; color: var(--bossa-ink); }}
+
+code {{
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", monospace;
+  background: var(--bossa-cream);
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.88em;
 }}
-.c-order {{ background: #f0fdf4; color: #16a34a; }}
 
 /* ── Footer ──────────────────────────────────────────── */
 .footer {{
   text-align: center;
   padding: 2rem;
-  color: #d1d5db;
-  font-size: 0.72rem;
-  letter-spacing: 0.02em;
+  color: var(--bossa-muted);
+  font-size: 0.74rem;
 }}
 
 /* ── Responsive ──────────────────────────────────────── */
 @media (max-width: 640px) {{
   .header       {{ padding: 1rem; }}
-  .summary-bar  {{ padding: 0.75rem 1rem; gap: 1.25rem; }}
+  .summary-bar  {{ padding: 0.85rem 1rem; gap: 1.5rem; }}
+  .stat-value   {{ font-size: 1.45rem; }}
   .content      {{ padding: 0 0.75rem; margin-top: 1rem; }}
   .tab-nav      {{ padding: 0 0.5rem; }}
   .stock-table td, .stock-table th {{ padding: 0.5rem 0.6rem; }}
   .cat-cell     {{ display: none; }}
-  .fill-col     {{ width: 120px; }}
+  .fill-col     {{ width: 110px; }}
   .pb-wrap      {{ width: 60px; }}
 }}
 </style>
