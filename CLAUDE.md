@@ -160,6 +160,7 @@ The `send_telegram()` function catches errors silently (prints to log, doesn't r
 | Date | Issue | Fix |
 |------|-------|-----|
 | 2026-04-12 | SSRS timed out at 07:54 SAST → "Test SSRS connection" step `sys.exit(1)` → workflow aborted before agent ran → no Telegram sent | Added `continue-on-error: true` to SSRS test step in `daily_brief.yml` |
+| 2026-05-07 | Dashboard at `bossa-sunningdale.netlify.app` stuck on 3 May version. Workflow ran daily and pushed `docs/index.html` updates, but Netlify ignored every commit. Cause: commit message contained `[skip ci]`, which Netlify honors to skip deploys. Original `[skip ci]` was added to prevent workflow recursion, but `daily_bar.yml` only triggers on `schedule`/`workflow_dispatch`, never `push` — so it served no purpose for Actions and silently broke Netlify. | Removed `[skip ci]` from the commit message in `daily_bar.yml`. To unblock the existing stuck deploy without waiting for tomorrow's run: Netlify dashboard → Deploys → "Trigger deploy" → "Clear cache and deploy site". |
 
 ---
 

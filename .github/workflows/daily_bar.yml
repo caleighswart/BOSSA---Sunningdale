@@ -77,6 +77,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "Dashboard unchanged — nothing to commit."
           else
-            git commit -m "chore: update bar stock dashboard [skip ci]"
+            git commit -m "chore: update bar stock dashboard"
             git push
           fi

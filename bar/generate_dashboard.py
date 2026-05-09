@@ -498,15 +498,71 @@ body {{
 .tab-pane        {{ display: none; }}
 .tab-pane.active {{ display: block; }}
 
+/* ── Search bar ─────────────────────────────────────── */
+.search-bar {{
+  background: var(--bossa-card);
+  border: 1px solid var(--bossa-cream-deep);
+  border-radius: 8px;
+  padding: 0.5rem 0.85rem;
+  margin-bottom: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  max-width: 480px;
+  box-shadow: 0 1px 3px rgba(26, 26, 26, 0.04);
+}}
+.search-bar:focus-within {{
+  border-color: var(--bossa-yellow);
+}}
+.search-bar input {{
+  font-family: inherit;
+  font-size: 0.9rem;
+  border: none;
+  background: transparent;
+  flex: 1;
+  outline: none;
+  color: var(--bossa-charcoal);
+  padding: 0.15rem 0;
+}}
+.search-bar input::placeholder {{
+  color: var(--bossa-muted);
+}}
+.search-clear {{
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--bossa-muted);
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  padding: 0 0.3rem;
+  display: none;
+  border-radius: 4px;
+}}
+.search-clear:hover {{ color: var(--bossa-ink); background: var(--bossa-cream); }}
+.search-empty {{
+  font-style: italic;
+  color: var(--bossa-muted);
+  font-size: 0.85rem;
+  margin: -0.5rem 0 1rem;
+  padding-left: 0.25rem;
+  display: none;
+}}
+
 /* ── Tables ───────────────────────────────────────────── */
 .stock-table {{
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: var(--bossa-card);
   border-radius: 8px;
-  overflow: hidden;
   box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06), 0 1px 2px rgba(26, 26, 26, 0.04);
   font-size: 0.875rem;
+}}
+.stock-table thead {{
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }}
 .stock-table thead th {{
   background: #faf7ee;
@@ -518,7 +574,12 @@ body {{
   letter-spacing: 0.06em;
   color: var(--bossa-muted);
   border-bottom: 1px solid var(--bossa-cream-deep);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }}
+.stock-table thead th:first-child {{ border-top-left-radius: 8px; }}
+.stock-table thead th:last-child  {{ border-top-right-radius: 8px; }}
 .stock-table thead th.num,
 .stock-table thead th.fill-col {{ text-align: center; }}
 .stock-table td {{
@@ -528,6 +589,8 @@ body {{
   color: var(--bossa-charcoal);
 }}
 .stock-table tbody tr:last-child td {{ border-bottom: none; }}
+.stock-table tbody tr:last-child td:first-child {{ border-bottom-left-radius: 8px; }}
+.stock-table tbody tr:last-child td:last-child  {{ border-bottom-right-radius: 8px; }}
 .stock-table tbody tr:hover {{ background: #fdfaf1; }}
 
 .cat-cell  {{ font-size: 0.74rem; color: var(--bossa-muted); font-weight: 500; width: 140px; white-space: nowrap; }}
@@ -633,7 +696,6 @@ body {{
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(26, 26, 26, 0.06), 0 1px 2px rgba(26, 26, 26, 0.04);
   margin-bottom: 1.25rem;
-  overflow: hidden;
 }}
 .supplier-header {{
   padding: 1rem 1.25rem;
@@ -773,6 +835,11 @@ code {{
 </nav>
 
 <div class="content">
+  <div class="search-bar">
+    <input type="text" id="product-search" placeholder="Search products…" autocomplete="off">
+    <button type="button" class="search-clear" id="search-clear" aria-label="Clear search">&times;</button>
+  </div>
+  <p class="search-empty" id="search-empty"></p>
   <div class="tab-pane active" id="tab-critical">{crit_tab}</div>
   <div class="tab-pane" id="tab-low">{low_tab}</div>
   <div class="tab-pane" id="tab-orders">{orders_tab}</div>
@@ -792,7 +859,50 @@ code {{
       document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      applyFilter();
     }});
+  }});
+
+  // ── Product search/filter ──────────────────────────
+  const searchInput = document.getElementById('product-search');
+  const searchClear = document.getElementById('search-clear');
+  const searchEmpty = document.getElementById('search-empty');
+
+  function applyFilter() {{
+    const q = searchInput.value.trim().toLowerCase();
+    const activePane = document.querySelector('.tab-pane.active');
+    searchClear.style.display = q ? 'inline-block' : 'none';
+    if (!activePane) return;
+
+    let visibleCount = 0;
+    activePane.querySelectorAll('.stock-table').forEach(table => {{
+      let tableVisibleRows = 0;
+      table.querySelectorAll('tbody tr').forEach(tr => {{
+        const nameCell = tr.querySelector('.name-cell');
+        if (!nameCell) return;
+        const match = !q || nameCell.textContent.toLowerCase().includes(q);
+        tr.style.display = match ? '' : 'none';
+        if (match) {{ tableVisibleRows++; visibleCount++; }}
+      }});
+      const supplierCard = table.closest('.supplier-card');
+      if (supplierCard) {{
+        supplierCard.style.display = tableVisibleRows ? '' : 'none';
+      }}
+    }});
+
+    if (q && visibleCount === 0) {{
+      searchEmpty.textContent = 'No products match \"' + q + '\".';
+      searchEmpty.style.display = 'block';
+    }} else {{
+      searchEmpty.style.display = 'none';
+    }}
+  }}
+
+  searchInput.addEventListener('input', applyFilter);
+  searchClear.addEventListener('click', () => {{
+    searchInput.value = '';
+    applyFilter();
+    searchInput.focus();
   }});
 
   function orderViaWA(btn) {{
