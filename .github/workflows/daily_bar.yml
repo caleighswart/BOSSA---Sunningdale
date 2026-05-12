@@ -65,8 +65,9 @@ jobs:
       - name: Generate dashboard
         working-directory: bar
         env:
-          PILOTLIVE_USERNAME: ${{ secrets.PILOTLIVE_USERNAME }}
-          PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
+          PILOTLIVE_USERNAME:    ${{ secrets.PILOTLIVE_USERNAME }}
+          PILOTLIVE_PASSWORD:    ${{ secrets.PILOTLIVE_PASSWORD }}
+          BOSSA_ORDERS_WEBHOOK:  ${{ secrets.BOSSA_ORDERS_WEBHOOK }}
         run: python generate_dashboard.py
 
       - name: Commit dashboard for Netlify deploy

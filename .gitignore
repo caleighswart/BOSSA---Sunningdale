@@ -10,3 +10,13 @@ __pycache__/
 # Sensitive
 *.env
 secrets.py
+
+# Local smoke build (never deployed)
+docs/_smoke.html
+
+# Sava's source stock-count workbook — contains volumes, never commit
+bar/April 26 Stock Count This one.xlsx
+
+# Claude harness state
+.claude/
+bar/.claude/

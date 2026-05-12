@@ -57,33 +57,57 @@ CATEGORY_ORDER = [
     "CBEV", "HBEV", "VAPES", "PACKAGING",
 ]
 
+# Unit labels shown alongside SOH/par values in the dashboard tables.
+# Draught is poured by the litre; everything else in the bar is bottled or unit-counted.
+CATEGORY_UNITS = {
+    "DRAUGHT":     "Litres",
+    "BEER":        "Bottles",
+    "CIDER":       "Bottles",
+    "SWINE":       "Bottles",
+    "WWINE":       "Bottles",
+    "RWINE":       "Bottles",
+    "PORTSHERRY":  "Bottles",
+    "WHISKEY":     "Bottles",
+    "BRANDY":      "Bottles",
+    "RUM":         "Bottles",
+    "WHITE SPIR":  "Bottles",
+    "LIQUEUR":     "Bottles",
+    "PREMIX":      "Bottles",
+    "CBEV":        "Units",
+    "HBEV":        "Units",
+    "VAPES":       "Units",
+    "PACKAGING":   "Units",
+}
+
 # ── SUPPLIERS ─────────────────────────────────────────────────────────────────
 # One entry per category. If multiple categories share a supplier, give them
-# the same 'whatsapp' number — they will be merged into one order card.
+# the same 'email' address — they will be merged into one order card.
 #
-# whatsapp: international format, digits only, no + or spaces (e.g. "27821234567")
-# contact:  rep's first name, used in the pre-filled WhatsApp message
+# email:    supplier address used by the Orders tab "Send Order via Email" button
+# whatsapp: international format, digits only (kept for fallback; no longer read
+#           by the dashboard but retained so we can switch back if needed)
+# contact:  rep's first name, used in the pre-filled order message
 #
-# Leave name/contact/whatsapp as "" until you have the details — the Orders
-# tab will still show the products but the WhatsApp button won't appear.
+# All emails are currently set to hello@makematicai.com for testing; replace
+# per-supplier once real addresses are confirmed.
 SUPPLIERS = {
-    "DRAUGHT":    {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "BEER":       {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "CIDER":      {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "SWINE":      {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "WWINE":      {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "RWINE":      {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "PORTSHERRY": {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "WHISKEY":    {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "BRANDY":     {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "RUM":        {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "WHITE SPIR": {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "LIQUEUR":    {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "PREMIX":     {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "CBEV":       {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "HBEV":       {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "VAPES":      {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
-    "PACKAGING":  {"name": "United Distributors",  "contact": "",  "whatsapp": ""},
+    "DRAUGHT":    {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "BEER":       {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "CIDER":      {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "SWINE":      {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "WWINE":      {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "RWINE":      {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "PORTSHERRY": {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "WHISKEY":    {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "BRANDY":     {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "RUM":        {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "WHITE SPIR": {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "LIQUEUR":    {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "PREMIX":     {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "CBEV":       {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "HBEV":       {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "VAPES":      {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
+    "PACKAGING":  {"name": "United Distributors",  "contact": "Sava",  "email": "hello@makematicai.com", "whatsapp": "27834436203"},
 }
 
 # ── THRESHOLDS ────────────────────────────────────────────────────────────────
