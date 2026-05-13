@@ -6,12 +6,12 @@ This file gives any Claude agent full operational context for the Bossa Sunningd
 
 ## What This System Does
 
-One scheduled job runs every morning:
+Two scheduled jobs run every morning, plus a self-healing health check:
 
 | Job | File | Time | Output |
 |-----|------|------|--------|
-| **Bar stock dashboard refresh** | `bar/generate_dashboard.py` | 05:13 SAST target (typically lands 09:30–10:30 SAST due to GH Actions cron delays) | Static HTML at `docs/index.html`, deployed by Netlify |
-| **Dashboard health check** | `.github/workflows/health_check.yml` | 11:33 SAST | Verifies the bar workflow succeeded today and the dashboard timestamp matches today (SAST); opens a deduped GitHub issue on failure |
+| **Bar stock dashboard refresh** | `bar/generate_dashboard.py` | Two crons daily for redundancy: 05:13 SAST target (primary) + 07:17 SAST target (backup). Typically land 4–5h late due to GH Actions delays. Generator is idempotent — running twice is harmless. | Static HTML at `docs/index.html`, deployed by Netlify |
+| **Dashboard health check** | `.github/workflows/health_check.yml` | 11:33 SAST | Verifies `daily_bar.yml` succeeded today and the dashboard timestamp matches today (SAST). **Self-heals** by auto-triggering `daily_bar.yml` via `workflow_dispatch` if both scheduled crons were dropped — opens an info issue (no email) on recovery, or a hard-failure issue (with email) on unrecoverable problems. |
 
 The dashboard is the only consumer surface. URL: `https://bossa-sunningdale.netlify.app/`
 
@@ -42,7 +42,7 @@ Telegram secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BAR_BOT_TOKEN`) can be deleted
 
 ```
 .github/workflows/
-  daily_bar.yml         — Bar dashboard refresh: 05:13 SAST target (cron: 13 3 * * *)
+  daily_bar.yml         — Bar dashboard refresh: 05:13 + 07:17 SAST targets (crons: 13 3 / 17 5 * * *)
   daily_brief.yml       — Inventory bot (DISABLED, manual trigger only)
   daily_prep.yml        — Prep bot       (DISABLED, manual trigger only)
 
@@ -118,6 +118,7 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-05-13 | Telegram briefs decommissioned across all three bots — dashboard is the only consumer surface. Bar workflow stripped of Telegram send step; inventory + prep workflows disabled (schedule removed, manual trigger only). | This change. Code for the disabled bots remains in the repo. |
 | 2026-05-13 | Dashboard wasn't updated by 08:30 SAST. Cron was `0 5 * * *` (07:00 SAST target) — a peak top-of-hour slot, and GitHub Actions consistently delayed the run by 1h 52m – 3h 24m, so it landed between 08:52 and 10:24 SAST. | Shifted cron to `13 3 * * *` (05:13 SAST target). Off-peak minute; even with typical 1–3h GH delay the run should land before 07:00 SAST. |
 | 2026-05-13 | Added daily dashboard health check (`health_check.yml`). First test fired at 09:13 SAST and (correctly) flagged that today's `daily_bar.yml` hadn't completed — empirically GH Actions delays the scheduled cron by 4-5h, not 1-3h, so the bar workflow typically lands 09:30–10:30 SAST. Health check at 09:13 SAST was inside the delay window and produced a false alarm. | Moved health check cron to `33 9 * * *` (11:33 SAST) to give a safe buffer past the worst observed delay. |
+| 2026-05-13 | GitHub silently dropped the scheduled `daily_bar.yml` cron entirely — no run fired at 03:13 UTC; by 10:05 SAST nothing was queued or in-progress for the day. Client needs the dashboard live every morning, so a single dropped cron = an outage. | (a) Added a backup cron at `17 5 * * *` (07:17 SAST target) so two independent slots have to be dropped to miss a day. (b) Extended `health_check.yml` to auto-trigger `daily_bar.yml` via `workflow_dispatch` when no successful run is found for today — opens an info issue (no email) on recovery so we still see when GH drops crons, but the dashboard self-heals by ~11:40 SAST in the worst case. |
 
 ---
 

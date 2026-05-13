@@ -4,14 +4,19 @@ name: Bossa Sunningdale — Daily Dashboard Health Check
 #   1. daily_bar.yml has a successful run completed today (SAST), AND
 #   2. The Netlify-served dashboard's "Updated" timestamp is today (SAST).
 #
-# If either check fails, opens a GitHub issue (deduped by title) and fails
-# the workflow so the standard failure email also fires. If a run is still
-# in progress when this fires, we skip the alert and try again tomorrow.
+# Self-healing: if no daily_bar.yml run succeeded today and nothing is in
+# progress, this workflow auto-triggers daily_bar.yml via workflow_dispatch
+# (GitHub Actions occasionally drops scheduled crons under load — this
+# converts that platform glitch from a dashboard outage into a ~15 min delay).
+# When auto-recovery fires, we open an info-level GitHub issue so there's an
+# audit trail, but exit 0 (no failure email — the system healed itself).
 #
-# Cron: 09:33 UTC = 11:33 SAST. Sized to fire well after daily_bar.yml is
-# expected to have completed. Empirically the scheduled bar run lands 4-5h
-# after its 03:13 UTC target (= 07:13-08:13 UTC). Running the check at
-# 09:33 UTC gives a 1h+ safety buffer past that worst-case completion.
+# Hard failures (fetch error, parse error, recovery failed) still open an
+# issue, fail the workflow, and trigger the standard failure email.
+#
+# Cron: 09:33 UTC = 11:33 SAST. Sized to fire well after both scheduled
+# daily_bar.yml runs (03:13 UTC and 05:17 UTC targets) have had time to
+# complete given typical 4-5h GH Actions cron delays.
 
 on:
   schedule:
@@ -21,7 +26,7 @@ on:
 permissions:
   contents: read
   issues:   write
-  actions:  read
+  actions:  write   # needed to workflow-dispatch daily_bar.yml on cron-drop recovery
 
 jobs:
   health-check:
@@ -61,7 +66,8 @@ jobs:
                   sys.exit(2)
               return r.stdout
 
-          problems = []
+          problems   = []   # hard failures → open issue, fail workflow
+          recoveries = []   # auto-healed   → open info issue, exit 0
 
           # ── 1. Did daily_bar.yml complete successfully today? ────────────────
           out = gh(["gh", "run", "list",
@@ -85,32 +91,53 @@ jobs:
                   completed_today_success = True
                   break
 
+          # If no successful run today and nothing is in progress, GitHub
+          # almost certainly dropped both scheduled crons. Self-heal by
+          # triggering daily_bar.yml via workflow_dispatch.
+          skip_dashboard_check = False
           if not completed_today_success:
               if in_progress:
                   print("ℹ️  daily_bar.yml is still running — skipping alert, will retry tomorrow.")
                   sys.exit(0)
-              if latest_completion is None:
-                  problems.append("No completed `daily_bar.yml` runs found in workflow history.")
-              else:
-                  r, ts = latest_completion
+
+              print("⚠️  No successful daily_bar.yml run today — auto-triggering as recovery.")
+              trigger = subprocess.run(
+                  ["gh", "workflow", "run", "daily_bar.yml",
+                   "--repo", REPO, "--ref", "main"],
+                  capture_output=True, text=True,
+              )
+              if trigger.returncode != 0:
                   problems.append(
-                      f"`daily_bar.yml` has not succeeded today (SAST). "
-                      f"Most recent completion: **{r['conclusion']}** at "
-                      f"{ts.strftime('%Y-%m-%d %H:%M SAST')} ({r['url']})."
+                      "GitHub Actions did not fire the scheduled `daily_bar.yml` today "
+                      "AND auto-recovery failed: "
+                      f"`{trigger.stderr.strip() or trigger.stdout.strip()}`. "
+                      "Trigger the workflow manually."
                   )
+              else:
+                  recoveries.append(
+                      "GitHub Actions did not fire the scheduled `daily_bar.yml` today. "
+                      f"Health check auto-triggered it at "
+                      f"{datetime.now(SAST).strftime('%H:%M SAST')} — "
+                      "dashboard should refresh within ~3 min."
+                  )
+                  # Skip the freshness check below — bar is about to run.
+                  skip_dashboard_check = True
 
           # ── 2. Is the Netlify-served dashboard fresh? ────────────────────────
           dashboard_url = os.environ["DASHBOARD_URL"]
           html = ""
-          try:
-              req = urllib.request.Request(
-                  dashboard_url,
-                  headers={"Cache-Control": "no-cache", "User-Agent": "bossa-health-check/1"},
-              )
-              with urllib.request.urlopen(req, timeout=30) as resp:
-                  html = resp.read().decode("utf-8", errors="ignore")
-          except Exception as e:
-              problems.append(f"Could not fetch dashboard at {dashboard_url}: {e}")
+          if skip_dashboard_check:
+              print("ℹ️  Skipping dashboard freshness check — bar workflow just triggered.")
+          else:
+              try:
+                  req = urllib.request.Request(
+                      dashboard_url,
+                      headers={"Cache-Control": "no-cache", "User-Agent": "bossa-health-check/1"},
+                  )
+                  with urllib.request.urlopen(req, timeout=30) as resp:
+                      html = resp.read().decode("utf-8", errors="ignore")
+              except Exception as e:
+                  problems.append(f"Could not fetch dashboard at {dashboard_url}: {e}")
 
           if html:
               m = re.search(
@@ -139,18 +166,31 @@ jobs:
                       problems.append(f"Couldn't parse dashboard timestamp: {e}")
 
           # ── 3. Healthy → exit ────────────────────────────────────────────────
-          if not problems:
+          if not problems and not recoveries:
               print("✅ Healthy — dashboard refreshed today (SAST).")
               sys.exit(0)
 
           # ── 4. Open or skip a deduped issue ──────────────────────────────────
-          title = f"⚠️ Bar dashboard health check failed — {today_str}"
           actions_url = f"https://github.com/{os.environ['GH_REPO']}/actions"
+
+          if problems:
+              title = f"⚠️ Bar dashboard health check failed — {today_str}"
+              body_lines = ["Hard failures:"]
+              body_lines += [f"- {p}" for p in problems]
+              if recoveries:
+                  body_lines += ["", "Auto-recovered (informational):"]
+                  body_lines += [f"- {r}" for r in recoveries]
+          else:
+              title = f"ℹ️ Bar dashboard auto-recovered — {today_str}"
+              body_lines = ["GitHub Actions dropped a scheduled run; "
+                            "health check self-healed:"]
+              body_lines += [f"- {r}" for r in recoveries]
+
           body = (
-              f"Health check on **{today_str}** (SAST) found the following issues:\n\n"
-              + "\n".join(f"- {p}" for p in problems)
+              f"Health check on **{today_str}** (SAST):\n\n"
+              + "\n".join(body_lines)
               + "\n\n"
-              + f"Investigate in [GitHub Actions]({actions_url}).\n\n"
+              + f"See [GitHub Actions]({actions_url}).\n\n"
               + "_Opened automatically by `health_check.yml`._\n"
           )
 
@@ -169,8 +209,12 @@ jobs:
                   "--body",  body])
               print("Opened issue.")
 
-          # Fail the workflow so the failure email also fires.
-          for p in problems:
-              print(f"::error::{p}")
-          sys.exit(1)
+          # Hard failures fail the workflow (triggers the standard email).
+          # Pure auto-recovery exits 0 (issue is the audit trail; no email noise).
+          if problems:
+              for p in problems:
+                  print(f"::error::{p}")
+              sys.exit(1)
+          print("✅ Auto-recovered — exiting 0.")
+          sys.exit(0)
           EOF

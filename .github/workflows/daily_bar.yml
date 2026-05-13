@@ -1,13 +1,18 @@
 name: Bossa Sunningdale — Daily Bar Stock Dashboard
 
 on:
-  # Runs every day targeting 05:13 SAST (03:13 UTC).
-  # Offset off the peak top-of-hour cron slot so GitHub Actions delays
-  # (usually 1–3h at 05:00 UTC) still land the dashboard well before 07:00 SAST.
+  # Two scheduled runs per day, ~2h apart, to harden against GitHub Actions
+  # silently dropping a scheduled cron (a known platform issue). The dashboard
+  # generator is fully idempotent and the commit step is "nothing to commit"
+  # safe, so running twice on a normal day is harmless.
+  #   Primary : 03:13 UTC = 05:13 SAST target (lands ~07:13–08:13 SAST)
+  #   Backup  : 05:17 UTC = 07:17 SAST target (lands ~09:17–10:17 SAST)
+  # If GitHub drops *both*, the 11:33 SAST health check auto-triggers a run.
   schedule:
     - cron: '13 3 * * *'
+    - cron: '17 5 * * *'
 
-  # Manual trigger from the Actions tab (for testing)
+  # Manual trigger from the Actions tab (for testing / recovery)
   workflow_dispatch:
 
 jobs:
