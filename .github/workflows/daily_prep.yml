@@ -26,7 +26,6 @@ jobs:
       - name: Run prep bot
         working-directory: prep
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           PILOTLIVE_USERNAME: ${{ secrets.PILOTLIVE_USERNAME }}
           PILOTLIVE_PASSWORD: ${{ secrets.PILOTLIVE_PASSWORD }}
         run: python main.py

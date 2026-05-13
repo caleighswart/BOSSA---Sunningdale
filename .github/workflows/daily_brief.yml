@@ -52,7 +52,6 @@ jobs:
       - name: Run inventory agent
         working-directory: inventory
         env:
-          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
           PILOTLIVE_USERNAME:  ${{ secrets.PILOTLIVE_USERNAME }}
           PILOTLIVE_PASSWORD:  ${{ secrets.PILOTLIVE_PASSWORD }}
         run: python main.py

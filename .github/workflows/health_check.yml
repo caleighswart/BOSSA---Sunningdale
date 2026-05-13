@@ -1,0 +1,167 @@
+name: Bossa Sunningdale — Daily Dashboard Health Check
+
+# Verifies once a day that:
+#   1. daily_bar.yml has a successful run completed today (SAST), AND
+#   2. The Netlify-served dashboard's "Updated" timestamp is today (SAST).
+#
+# If either check fails, opens a GitHub issue (deduped by title) and fails
+# the workflow so the standard failure email also fires. If a run is still
+# in progress when this fires, we skip the alert and try again tomorrow.
+#
+# Cron: 07:13 UTC = 09:13 SAST. Off-peak minute. The bar workflow targets
+# 05:13 SAST and historically finishes within 1-3h, so by 09:13 SAST it
+# should have either completed or clearly failed.
+
+on:
+  schedule:
+    - cron: '13 7 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues:   write
+  actions:  read
+
+jobs:
+  health-check:
+    name: Verify dashboard freshness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run health check
+        env:
+          GH_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO:           ${{ github.repository }}
+          DASHBOARD_URL:     https://bossa-sunningdale.netlify.app/
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+          import re
+          import subprocess
+          import sys
+          import urllib.request
+          from datetime import datetime, timezone, timedelta
+
+          SAST = timezone(timedelta(hours=2))
+          today_sast = datetime.now(SAST).date()
+          today_str  = today_sast.isoformat()
+
+          problems = []
+
+          # ── 1. Did daily_bar.yml complete successfully today? ────────────────
+          out = subprocess.run(
+              ["gh", "run", "list",
+               "--workflow=daily_bar.yml",
+               "--limit=10",
+               "--json", "status,conclusion,updatedAt,htmlUrl"],
+              capture_output=True, text=True, check=True
+          )
+          runs = json.loads(out.stdout)
+
+          in_progress = any(r["status"] in ("queued", "in_progress", "waiting") for r in runs)
+
+          completed_today_success = False
+          latest_completion = None
+          for r in runs:
+              if r["status"] != "completed":
+                  continue
+              ts = datetime.fromisoformat(r["updatedAt"].replace("Z", "+00:00")).astimezone(SAST)
+              if latest_completion is None:
+                  latest_completion = (r, ts)
+              if ts.date() == today_sast and r["conclusion"] == "success":
+                  completed_today_success = True
+                  break
+
+          if not completed_today_success:
+              if in_progress:
+                  print("ℹ️  daily_bar.yml is still running — skipping alert, will retry tomorrow.")
+                  sys.exit(0)
+              if latest_completion is None:
+                  problems.append("No completed `daily_bar.yml` runs found in workflow history.")
+              else:
+                  r, ts = latest_completion
+                  problems.append(
+                      f"`daily_bar.yml` has not succeeded today (SAST). "
+                      f"Most recent completion: **{r['conclusion']}** at "
+                      f"{ts.strftime('%Y-%m-%d %H:%M SAST')} ({r['htmlUrl']})."
+                  )
+
+          # ── 2. Is the Netlify-served dashboard fresh? ────────────────────────
+          dashboard_url = os.environ["DASHBOARD_URL"]
+          html = ""
+          try:
+              req = urllib.request.Request(
+                  dashboard_url,
+                  headers={"Cache-Control": "no-cache", "User-Agent": "bossa-health-check/1"},
+              )
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  html = resp.read().decode("utf-8", errors="ignore")
+          except Exception as e:
+              problems.append(f"Could not fetch dashboard at {dashboard_url}: {e}")
+
+          if html:
+              m = re.search(
+                  r'Updated\s+(\d+)\s+(\w+)\s+(\d{4}),\s+(\d{2}):(\d{2})\s+SAST',
+                  html,
+              )
+              if not m:
+                  problems.append(
+                      "Couldn't find `Updated <date>` line in dashboard HTML — "
+                      "template may have changed."
+                  )
+              else:
+                  day, mon, year, hh, mm = m.groups()
+                  try:
+                      dashboard_dt = datetime.strptime(
+                          f"{day} {mon} {year} {hh}:{mm}",
+                          "%d %b %Y %H:%M",
+                      ).replace(tzinfo=SAST)
+                      if dashboard_dt.date() != today_sast:
+                          problems.append(
+                              f"Dashboard timestamp is **{dashboard_dt.strftime('%d %b %Y %H:%M SAST')}** "
+                              f"but today (SAST) is **{today_str}**. "
+                              f"Likely Netlify did not deploy the latest commit."
+                          )
+                  except ValueError as e:
+                      problems.append(f"Couldn't parse dashboard timestamp: {e}")
+
+          # ── 3. Healthy → exit ────────────────────────────────────────────────
+          if not problems:
+              print("✅ Healthy — dashboard refreshed today (SAST).")
+              sys.exit(0)
+
+          # ── 4. Open or skip a deduped issue ──────────────────────────────────
+          title = f"⚠️ Bar dashboard health check failed — {today_str}"
+          actions_url = f"https://github.com/{os.environ['GH_REPO']}/actions"
+          body = (
+              f"Health check on **{today_str}** (SAST) found the following issues:\n\n"
+              + "\n".join(f"- {p}" for p in problems)
+              + "\n\n"
+              + f"Investigate in [GitHub Actions]({actions_url}).\n\n"
+              + "_Opened automatically by `health_check.yml`._\n"
+          )
+
+          existing = subprocess.run(
+              ["gh", "issue", "list", "--state=open",
+               "--search", f'in:title "{title}"',
+               "--json", "number"],
+              capture_output=True, text=True, check=True,
+          )
+          dups = json.loads(existing.stdout)
+          if dups:
+              print(f"Issue already open (#{dups[0]['number']}); not re-opening.")
+          else:
+              subprocess.run(
+                  ["gh", "issue", "create",
+                   "--title", title,
+                   "--body",  body],
+                  check=True,
+              )
+              print("Opened issue.")
+
+          # Fail the workflow so the failure email also fires.
+          for p in problems:
+              print(f"::error::{p}")
+          sys.exit(1)
+          EOF

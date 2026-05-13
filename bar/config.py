@@ -11,13 +11,6 @@ par levels for bar stock only, not category-wide pars.
 import os
 import json
 
-# ── TELEGRAM RECIPIENTS ───────────────────────────────────────────────────────
-# Add the bar manager's Telegram chat ID once confirmed.
-RECIPIENTS = {
-    "caleigh":     "7399544281",   # Caleigh (owner)
-    # "bar_manager": "TODO",       # Add the bar manager's Telegram chat ID here
-}
-
 # ── PILOTLIVE CATEGORIES IN SCOPE ─────────────────────────────────────────────
 # Every category represented in Sava's bar count sheet.
 BAR_CATEGORIES = {
@@ -28,7 +21,7 @@ BAR_CATEGORIES = {
     "PACKAGING", "VAPES", "HBEV",
 }
 
-# Pretty labels used in the Telegram brief (ordered for display).
+# Pretty labels used in the dashboard (ordered for display).
 CATEGORY_LABELS = {
     "DRAUGHT":     "Draught",
     "BEER":        "Beer",
@@ -49,7 +42,7 @@ CATEGORY_LABELS = {
     "PACKAGING":   "Packaging",
 }
 
-# Display order of categories in the brief.
+# Display order of categories in the dashboard.
 CATEGORY_ORDER = [
     "DRAUGHT", "BEER", "CIDER",
     "SWINE", "WWINE", "RWINE", "PORTSHERRY",
