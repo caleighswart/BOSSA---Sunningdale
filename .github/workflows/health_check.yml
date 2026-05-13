@@ -47,17 +47,28 @@ jobs:
           today_sast = datetime.now(SAST).date()
           today_str  = today_sast.isoformat()
 
+          REPO = os.environ["GH_REPO"]
+
+          def gh(args):
+              """Run gh CLI, surface stderr on failure."""
+              r = subprocess.run(args, capture_output=True, text=True)
+              if r.returncode != 0:
+                  sys.stderr.write(
+                      f"::error::gh command failed: {' '.join(args)}\n"
+                      f"stdout: {r.stdout}\nstderr: {r.stderr}\n"
+                  )
+                  sys.exit(2)
+              return r.stdout
+
           problems = []
 
           # ── 1. Did daily_bar.yml complete successfully today? ────────────────
-          out = subprocess.run(
-              ["gh", "run", "list",
-               "--workflow=daily_bar.yml",
-               "--limit=10",
-               "--json", "status,conclusion,updatedAt,htmlUrl"],
-              capture_output=True, text=True, check=True
-          )
-          runs = json.loads(out.stdout)
+          out = gh(["gh", "run", "list",
+                    "--repo", REPO,
+                    "--workflow=daily_bar.yml",
+                    "--limit=10",
+                    "--json", "status,conclusion,updatedAt,url"])
+          runs = json.loads(out)
 
           in_progress = any(r["status"] in ("queued", "in_progress", "waiting") for r in runs)
 
@@ -84,7 +95,7 @@ jobs:
                   problems.append(
                       f"`daily_bar.yml` has not succeeded today (SAST). "
                       f"Most recent completion: **{r['conclusion']}** at "
-                      f"{ts.strftime('%Y-%m-%d %H:%M SAST')} ({r['htmlUrl']})."
+                      f"{ts.strftime('%Y-%m-%d %H:%M SAST')} ({r['url']})."
                   )
 
           # ── 2. Is the Netlify-served dashboard fresh? ────────────────────────
@@ -142,22 +153,19 @@ jobs:
               + "_Opened automatically by `health_check.yml`._\n"
           )
 
-          existing = subprocess.run(
-              ["gh", "issue", "list", "--state=open",
-               "--search", f'in:title "{title}"',
-               "--json", "number"],
-              capture_output=True, text=True, check=True,
-          )
-          dups = json.loads(existing.stdout)
+          existing = gh(["gh", "issue", "list",
+                         "--repo", REPO,
+                         "--state=open",
+                         "--search", f'in:title "{title}"',
+                         "--json", "number"])
+          dups = json.loads(existing)
           if dups:
               print(f"Issue already open (#{dups[0]['number']}); not re-opening.")
           else:
-              subprocess.run(
-                  ["gh", "issue", "create",
-                   "--title", title,
-                   "--body",  body],
-                  check=True,
-              )
+              gh(["gh", "issue", "create",
+                  "--repo", REPO,
+                  "--title", title,
+                  "--body",  body])
               print("Opened issue.")
 
           # Fail the workflow so the failure email also fires.
