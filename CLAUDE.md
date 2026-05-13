@@ -10,7 +10,8 @@ One scheduled job runs every morning:
 
 | Job | File | Time | Output |
 |-----|------|------|--------|
-| **Bar stock dashboard refresh** | `bar/generate_dashboard.py` | 05:13 SAST target (lands by ~07:00 SAST) | Static HTML at `docs/index.html`, deployed by Netlify |
+| **Bar stock dashboard refresh** | `bar/generate_dashboard.py` | 05:13 SAST target (typically lands 09:30–10:30 SAST due to GH Actions cron delays) | Static HTML at `docs/index.html`, deployed by Netlify |
+| **Dashboard health check** | `.github/workflows/health_check.yml` | 11:33 SAST | Verifies the bar workflow succeeded today and the dashboard timestamp matches today (SAST); opens a deduped GitHub issue on failure |
 
 The dashboard is the only consumer surface. URL: `https://bossa-sunningdale.netlify.app/`
 
@@ -116,13 +117,13 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-05-07 | Dashboard at `bossa-sunningdale.netlify.app` stuck on 3 May version. Workflow ran daily and pushed `docs/index.html` updates, but Netlify ignored every commit. Cause: commit message contained `[skip ci]`, which Netlify honors to skip deploys. | Removed `[skip ci]` from the commit message in `daily_bar.yml`. Unblock a stuck deploy via Netlify dashboard → Deploys → "Trigger deploy" → "Clear cache and deploy site". |
 | 2026-05-13 | Telegram briefs decommissioned across all three bots — dashboard is the only consumer surface. Bar workflow stripped of Telegram send step; inventory + prep workflows disabled (schedule removed, manual trigger only). | This change. Code for the disabled bots remains in the repo. |
 | 2026-05-13 | Dashboard wasn't updated by 08:30 SAST. Cron was `0 5 * * *` (07:00 SAST target) — a peak top-of-hour slot, and GitHub Actions consistently delayed the run by 1h 52m – 3h 24m, so it landed between 08:52 and 10:24 SAST. | Shifted cron to `13 3 * * *` (05:13 SAST target). Off-peak minute; even with typical 1–3h GH delay the run should land before 07:00 SAST. |
+| 2026-05-13 | Added daily dashboard health check (`health_check.yml`). First test fired at 09:13 SAST and (correctly) flagged that today's `daily_bar.yml` hadn't completed — empirically GH Actions delays the scheduled cron by 4-5h, not 1-3h, so the bar workflow typically lands 09:30–10:30 SAST. Health check at 09:13 SAST was inside the delay window and produced a false alarm. | Moved health check cron to `33 9 * * *` (11:33 SAST) to give a safe buffer past the worst observed delay. |
 
 ---
 
 ## TODO (pending confirmation from Sava)
 
 - Fill in missing par levels for the items flagged in the dashboard's "PAR MISSING" admin tab (mix cocktails, Slo Jo syrups, glenfiddich/bushmills range, vapes, etc.)
-- Delete unused Telegram secrets from GitHub repo settings (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BAR_BOT_TOKEN`) — no longer referenced
 
 ---
 

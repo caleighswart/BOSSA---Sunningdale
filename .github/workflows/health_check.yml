@@ -8,13 +8,14 @@ name: Bossa Sunningdale — Daily Dashboard Health Check
 # the workflow so the standard failure email also fires. If a run is still
 # in progress when this fires, we skip the alert and try again tomorrow.
 #
-# Cron: 07:13 UTC = 09:13 SAST. Off-peak minute. The bar workflow targets
-# 05:13 SAST and historically finishes within 1-3h, so by 09:13 SAST it
-# should have either completed or clearly failed.
+# Cron: 09:33 UTC = 11:33 SAST. Sized to fire well after daily_bar.yml is
+# expected to have completed. Empirically the scheduled bar run lands 4-5h
+# after its 03:13 UTC target (= 07:13-08:13 UTC). Running the check at
+# 09:33 UTC gives a 1h+ safety buffer past that worst-case completion.
 
 on:
   schedule:
-    - cron: '13 7 * * *'
+    - cron: '33 9 * * *'
   workflow_dispatch:
 
 permissions:
