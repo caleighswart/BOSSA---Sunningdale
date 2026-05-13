@@ -1,11 +1,9 @@
-name: Bossa Sunningdale — Daily Stock Brief
+name: Bossa Sunningdale — Daily Stock Brief (disabled)
 
+# Disabled 2026-05-13: inventory brief no longer used. Telegram output dropped
+# in favour of the bar dashboard. Workflow kept dormant (manual trigger only)
+# in case the inventory brief is revived. Re-enable by restoring the schedule.
 on:
-  # Runs every day at 06:00 SAST (04:00 UTC)
-  schedule:
-    - cron: '0 4 * * *'
-
-  # Also allows manual trigger from GitHub Actions tab (for testing)
   workflow_dispatch:
 
 jobs:

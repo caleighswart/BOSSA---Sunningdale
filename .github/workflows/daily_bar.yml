@@ -1,16 +1,18 @@
-name: Bossa Sunningdale — Daily Bar Stock Brief
+name: Bossa Sunningdale — Daily Bar Stock Dashboard
 
 on:
-  # Runs every day at 07:00 SAST (05:00 UTC)
+  # Runs every day targeting 05:13 SAST (03:13 UTC).
+  # Offset off the peak top-of-hour cron slot so GitHub Actions delays
+  # (usually 1–3h at 05:00 UTC) still land the dashboard well before 07:00 SAST.
   schedule:
-    - cron: '0 5 * * *'
+    - cron: '13 3 * * *'
 
   # Manual trigger from the Actions tab (for testing)
   workflow_dispatch:
 
 jobs:
-  send-bar-brief:
-    name: Analyse bar stock & send Telegram brief
+  refresh-dashboard:
+    name: Refresh bar stock dashboard
     runs-on: ubuntu-latest
 
     permissions:
@@ -53,14 +55,6 @@ jobs:
               print(f"SSRS connection FAILED: {e}")
               sys.exit(1)
           EOF
-
-      - name: Run bar agent
-        working-directory: bar
-        env:
-          TELEGRAM_BAR_BOT_TOKEN: ${{ secrets.TELEGRAM_BAR_BOT_TOKEN }}
-          PILOTLIVE_USERNAME:     ${{ secrets.PILOTLIVE_USERNAME }}
-          PILOTLIVE_PASSWORD:     ${{ secrets.PILOTLIVE_PASSWORD }}
-        run: python main.py
 
       - name: Generate dashboard
         working-directory: bar

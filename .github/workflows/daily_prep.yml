@@ -1,11 +1,9 @@
-name: Bossa Sunningdale — Daily Prep List
+name: Bossa Sunningdale — Daily Prep List (disabled)
 
+# Disabled 2026-05-13: prep brief no longer used. Telegram output dropped in
+# favour of the bar dashboard. Workflow kept dormant (manual trigger only) in
+# case the prep brief is revived. Re-enable by restoring the schedule.
 on:
-  # Runs every day at 08:00 SAST (06:00 UTC) — before morning prep session
-  schedule:
-    - cron: '0 6 * * *'
-
-  # Manual trigger for testing
   workflow_dispatch:
 
 jobs:

@@ -6,19 +6,21 @@ This file gives any Claude agent full operational context for the Bossa Sunningd
 
 ## What This System Does
 
-Three GitHub Actions bots run automatically every morning:
+One scheduled job runs every morning:
 
-| Bot | File | Time | Recipient |
-|-----|------|------|-----------|
-| **Inventory brief** | `inventory/main.py` | 06:00 SAST daily | Caleigh via Telegram |
-| **Bar stock brief** | `bar/main.py` | 07:00 SAST daily | Caleigh + bar manager via Telegram |
-| **Prep variance** | `prep/main.py` | 08:00 SAST daily | Chef via Telegram |
+| Job | File | Time | Output |
+|-----|------|------|--------|
+| **Bar stock dashboard refresh** | `bar/generate_dashboard.py` | 05:13 SAST target (lands by ~07:00 SAST) | Static HTML at `docs/index.html`, deployed by Netlify |
 
-The bar bot also generates a **static HTML dashboard** at `docs/index.html`, published via Netlify. It shows the same data as the Telegram brief in a clean, tabbed interface for managers to review and place orders. URL: `https://bossa-sunningdale.netlify.app/`
+The dashboard is the only consumer surface. URL: `https://bossa-sunningdale.netlify.app/`
 
-All three bots pull live stock data from PilotLive's SSRS report server, analyse it, and send a formatted Telegram message.
+The job pulls live stock data from PilotLive's SSRS report server, matches every SKU against Sava's per-product par levels (`bar/pars.json`, 404 products), and rebuilds the dashboard. It classifies each SKU as critical/low/healthy against its own par level and surfaces missing pars, variances, and new products added to PilotLive that Sava hasn't added to her count sheet yet.
 
-The **bar bot** is product-specific — it uses per-SKU par levels from Sava's "Bar Bev Count 2025" spreadsheet (stored in `bar/pars.json`, 404 products), unlike the inventory bot which uses category-wide defaults. It classifies every alcohol/mixer SKU as critical/low/healthy against its own par level and also surfaces missing pars, variances, and new products added to PilotLive that Sava hasn't added to her count sheet yet.
+### Disabled but kept in the repo
+
+The inventory and prep bots used to send daily Telegram briefs. As of 2026-05-13 they are **disabled** — schedules removed from the workflows; code untouched. They can be re-enabled by restoring the cron in their workflow files. The bar Telegram bot is also disabled (the `bar/main.py` Telegram send step was removed from the workflow; `bar/main.py` itself is left in place).
+
+Telegram secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BAR_BOT_TOKEN`) can be deleted from GitHub Secrets — nothing references them anymore.
 
 ---
 
@@ -26,12 +28,10 @@ The **bar bot** is product-specific — it uses per-SKU par levels from Sava's "
 
 | What | Where | Value |
 |------|-------|-------|
-| PilotLive username | GitHub Secret + hardcoded reference | `0834436203` |
-| PilotLive password | **GitHub Secret only** — never local | `PILOTLIVE_PASSWORD` |
-| Telegram bot token (inventory + prep) | GitHub Secret + hardcoded fallback in `main.py` | `TELEGRAM_BOT_TOKEN` |
-| Telegram bot token (bar bot — separate chat) | GitHub Secret only | `TELEGRAM_BAR_BOT_TOKEN` |
-| Caleigh's Telegram chat ID | `inventory/config.py` / `bar/config.py` `RECIPIENTS` | `7399544281` |
-| Sava's Telegram chat ID | `inventory/config.py` — not yet set | `TODO` |
+| PilotLive username | GitHub Secret | `PILOTLIVE_USERNAME` (`0834436203`) |
+| PilotLive password | GitHub Secret | `PILOTLIVE_PASSWORD` |
+| Orders webhook URL | GitHub Secret | `BOSSA_ORDERS_WEBHOOK` (used by dashboard "Place Order" buttons) |
+| ~~Telegram tokens~~ | ~~GitHub Secret~~ | Unused since 2026-05-13 — safe to delete from repo Settings |
 
 **GitHub Secrets location:** repo → Settings → Secrets and variables → Actions
 
@@ -41,35 +41,27 @@ The **bar bot** is product-specific — it uses per-SKU par levels from Sava's "
 
 ```
 .github/workflows/
-  daily_brief.yml       — Inventory bot: 06:00 SAST (cron: 0 4 * * *)
-  daily_bar.yml         — Bar bot:       07:00 SAST (cron: 0 5 * * *); also generates dashboard
-  daily_prep.yml        — Prep bot:      08:00 SAST (cron: 0 6 * * *)
+  daily_bar.yml         — Bar dashboard refresh: 05:13 SAST target (cron: 13 3 * * *)
+  daily_brief.yml       — Inventory bot (DISABLED, manual trigger only)
+  daily_prep.yml        — Prep bot       (DISABLED, manual trigger only)
 
 docs/
   index.html            — Auto-generated bar stock dashboard (Netlify)
 
-inventory/
-  main.py               — Entrypoint: load → analyse → Telegram
-  analyse.py            — Stock analysis engine + brief builder
-  pilotcloud.py         — SSRS XML download (NTLM auth)
-  config.py             — Par levels, groups, recipients, suppliers
-  requirements.txt      — pandas, openpyxl, requests, requests-ntlm
-  data/                 — Excel fallback files (most recent used if SSRS fails)
-
 bar/
-  main.py               — Entrypoint: load → match → analyse → Telegram
+  generate_dashboard.py — ACTIVE: SSRS fetch → analyse → write docs/index.html
   analyse.py            — Per-product par matching + brief builder
-  pilotfetch.py         — SSRS fetch (independent of inventory/prep)
-  config.py             — Recipients, categories, thresholds
+  pilotfetch.py         — SSRS fetch
+  config.py             — Categories, thresholds, suppliers
   pars.json             — 404 product → par mapping (from Sava's count sheet)
+  main.py               — DORMANT: old Telegram-send entrypoint (no longer run)
   requirements.txt
 
-prep/
-  main.py               — Entrypoint: fetch variances → Telegram
-  pilotfetch.py         — SSRS fetch (same auth as inventory)
-  prep_engine.py        — Variance analysis + brief builder
-  prep_config.py        — Chef chat ID, prep categories, thresholds
-  requirements.txt
+inventory/               — DORMANT: workflow disabled, code untouched
+  main.py, analyse.py, pilotcloud.py, config.py, requirements.txt, data/
+
+prep/                    — DORMANT: workflow disabled, code untouched
+  main.py, pilotfetch.py, prep_engine.py, prep_config.py, requirements.txt
 
 PILOTLIVE_DATA_PULL.md  — Full SSRS technical reference
 CLAUDE.md               — This file
@@ -94,64 +86,25 @@ Authorization: NTLM (username=0834436203, password=from env)
 
 ---
 
-## Telegram Bots
+## Debugging: Dashboard didn't update
 
-Two separate Telegram bots so the bar brief arrives in its own chat,
-distinct from the inventory/prep brief chat.
-
-**Inventory + Prep bot:**
-- Bot name:   BossaSunningdaleBot
-- Bot ID:     `8562498363`
-- Token:      `TELEGRAM_BOT_TOKEN` GitHub Secret (hardcoded fallback in `inventory/main.py` and `prep/main.py`)
-- Used by:    `inventory/main.py` and `prep/main.py`
-
-**Bar bot:**
-- Bot name:   BossaBarBot (create via @BotFather — see setup below)
-- Token:      `TELEGRAM_BAR_BOT_TOKEN` GitHub Secret (no hardcoded fallback)
-- Used by:    `bar/main.py`
-
-**Setup for the bar bot (one-time):**
-1. In Telegram, open a chat with `@BotFather`.
-2. Send `/newbot`. Name it (e.g. "Bossa Bar Stock Bot"). BotFather gives you a token.
-3. Search for your new bot in Telegram and click "Start". This gives the bot permission to message you.
-4. In GitHub repo → Settings → Secrets and variables → Actions → New repository secret:
-   - Name: `TELEGRAM_BAR_BOT_TOKEN`
-   - Value: the token BotFather gave you
-5. Trigger `daily_bar.yml` manually — brief arrives in the new chat.
-
-**Common commands:**
-- Test bot is alive:    `GET https://api.telegram.org/bot{TOKEN}/getMe`
-- Send test message:    `POST https://api.telegram.org/bot{TOKEN}/sendMessage` with `{"chat_id":"7399544281","text":"test"}`
-- All messages use HTML parse mode, chunked at 4000 chars.
-
----
-
-## Debugging: Bot Didn't Send a Message
-
-**Step 1 — Check GitHub Actions run:**
-Go to `github.com/caleighswart/BOSSA---Sunningdale/actions/workflows/daily_brief.yml`
-Find today's run. If ❌ failed, click into it → click job in sidebar → read step logs.
+**Step 1 — Check the GitHub Actions run:**
+GitHub → Actions → "Bossa Sunningdale — Daily Bar Stock Dashboard" → today's run. If ❌, click into the failing step.
 
 **Step 2 — Common failure: SSRS timeout**
-Symptom: "Test SSRS connection" step ❌, log shows `Read timed out`.
-Fix: already applied (`continue-on-error: true` on that step). If it happens again despite the fix, check the SSRS server is reachable:
+Symptom: "Test SSRS connection" step prints `Read timed out`.
+That step is `continue-on-error: true`, so the workflow continues to "Generate dashboard". If `generate_dashboard.py` *also* can't reach SSRS, it will fail and the dashboard won't update. Verify SSRS is up:
 ```bash
 curl -s -o /dev/null -w "%{http_code}" --max-time 10 https://reports.pilotlive.co.za/ReportServer
 # Should return 401 (up, needs auth). TIMEOUT or 000 = server down.
 ```
 
-**Step 3 — Verify Telegram bot is alive:**
-```bash
-curl -s "https://api.telegram.org/bot{TOKEN}/getMe"
-# Should return {"ok":true,...}
-```
+**Step 3 — Workflow succeeded but Netlify shows old date**
+Check whether the "Commit dashboard for Netlify deploy" step actually committed something. If it printed "Dashboard unchanged — nothing to commit", nothing pushed — SSRS likely returned the same data as yesterday. If it *did* push, check Netlify dashboard → Deploys.
+Historical bug (2026-05-07): `[skip ci]` in the commit message caused Netlify to ignore commits. Don't reintroduce it.
 
 **Step 4 — Trigger a manual run:**
-GitHub Actions UI → "Run workflow" dropdown → Branch: main → green "Run workflow" button.
-The run takes ~1m 15s. Check for a new message on Telegram after it completes.
-
-**Step 5 — If workflow ran but no message received:**
-The `send_telegram()` function catches errors silently (prints to log, doesn't raise). Check the job log for lines like `❌ HTTP 400` or `❌ Telegram error`. A 400 means parse error in the message HTML.
+GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15s.
 
 ---
 
@@ -159,32 +112,27 @@ The `send_telegram()` function catches errors silently (prints to log, doesn't r
 
 | Date | Issue | Fix |
 |------|-------|-----|
-| 2026-04-12 | SSRS timed out at 07:54 SAST → "Test SSRS connection" step `sys.exit(1)` → workflow aborted before agent ran → no Telegram sent | Added `continue-on-error: true` to SSRS test step in `daily_brief.yml` |
-| 2026-05-07 | Dashboard at `bossa-sunningdale.netlify.app` stuck on 3 May version. Workflow ran daily and pushed `docs/index.html` updates, but Netlify ignored every commit. Cause: commit message contained `[skip ci]`, which Netlify honors to skip deploys. Original `[skip ci]` was added to prevent workflow recursion, but `daily_bar.yml` only triggers on `schedule`/`workflow_dispatch`, never `push` — so it served no purpose for Actions and silently broke Netlify. | Removed `[skip ci]` from the commit message in `daily_bar.yml`. To unblock the existing stuck deploy without waiting for tomorrow's run: Netlify dashboard → Deploys → "Trigger deploy" → "Clear cache and deploy site". |
+| 2026-04-12 | SSRS timed out at 07:54 SAST → "Test SSRS connection" step `sys.exit(1)` → workflow aborted before agent ran | Added `continue-on-error: true` to SSRS test step |
+| 2026-05-07 | Dashboard at `bossa-sunningdale.netlify.app` stuck on 3 May version. Workflow ran daily and pushed `docs/index.html` updates, but Netlify ignored every commit. Cause: commit message contained `[skip ci]`, which Netlify honors to skip deploys. | Removed `[skip ci]` from the commit message in `daily_bar.yml`. Unblock a stuck deploy via Netlify dashboard → Deploys → "Trigger deploy" → "Clear cache and deploy site". |
+| 2026-05-13 | Telegram briefs decommissioned across all three bots — dashboard is the only consumer surface. Bar workflow stripped of Telegram send step; inventory + prep workflows disabled (schedule removed, manual trigger only). | This change. Code for the disabled bots remains in the repo. |
+| 2026-05-13 | Dashboard wasn't updated by 08:30 SAST. Cron was `0 5 * * *` (07:00 SAST target) — a peak top-of-hour slot, and GitHub Actions consistently delayed the run by 1h 52m – 3h 24m, so it landed between 08:52 and 10:24 SAST. | Shifted cron to `13 3 * * *` (05:13 SAST target). Off-peak minute; even with typical 1–3h GH delay the run should land before 07:00 SAST. |
 
 ---
 
 ## TODO (pending confirmation from Sava)
 
-- Add Sava's Telegram chat ID to `RECIPIENTS` in `inventory/config.py`
-- Confirm par levels in `inventory/config.py` (all currently defaults)
-- Fill in supplier names, contacts, and WhatsApp numbers in `inventory/config.py`
-- Add chef's Telegram chat ID to `prep/prep_config.py` (currently uses Caleigh's for testing)
-- Add bar manager's Telegram chat ID to `RECIPIENTS` in `bar/config.py`
-- Fill in missing par levels for the 40 items flagged in the bar brief's "PAR MISSING" section (mix cocktails, Slo Jo syrups, glenfiddich/bushmills range, vapes, etc.)
+- Fill in missing par levels for the items flagged in the dashboard's "PAR MISSING" admin tab (mix cocktails, Slo Jo syrups, glenfiddich/bushmills range, vapes, etc.)
+- Delete unused Telegram secrets from GitHub repo settings (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BAR_BOT_TOKEN`) — no longer referenced
 
 ---
 
 ## Modifying This System
 
-- **Change inventory par levels:** edit `GROUPS` dict in `inventory/config.py`
 - **Change bar par levels:** edit `bar/pars.json` (keys = PilotLive product names)
-- **Add a recipient:** add `"name": "chat_id"` to `RECIPIENTS` in relevant `config.py`
-- **Change send time:** edit cron in `.github/workflows/*.yml` (UTC — SAST is UTC+2)
-- **Add a prep category:** add to `PREP_CATEGORIES` in `prep/prep_config.py`
-- **Change variance thresholds:** edit `HIGH_VARIANCE_PCT` / `WATCH_VARIANCE_PCT` in `prep/prep_config.py`
+- **Change refresh time:** edit cron in `.github/workflows/daily_bar.yml` (UTC — SAST is UTC+2)
 - **Change bar stock thresholds:** edit `CRITICAL_PCT` / `LOW_PCT` in `bar/config.py`
 - **Add/update supplier details:** edit `SUPPLIERS` dict in `bar/config.py` (name, contact, whatsapp per category; same whatsapp number = merged into one order card)
+- **Re-enable inventory or prep:** restore `schedule:` block in the relevant workflow file
 
 ---
 
@@ -207,8 +155,8 @@ Netlify watches the `main` branch and auto-deploys whenever `docs/index.html` is
 - **Admin tab** — missing par levels + new PilotLive products not on Sava's sheet
 
 **How it's generated:**
-- `generate_dashboard.py` fetches fresh SSRS data (separate call from `main.py`) and builds a self-contained HTML file with no external dependencies
-- `daily_bar.yml` commits `docs/index.html` to the repo with `[skip ci]` to prevent workflow loops
+- `generate_dashboard.py` fetches fresh SSRS data and builds a self-contained HTML file with no external dependencies
+- `daily_bar.yml` commits `docs/index.html` to the repo (no `[skip ci]` — Netlify needs to see the push)
 - Netlify serves it automatically — no server, no credentials exposed at the URL
 
 **Updating the dashboard outside the scheduled run:**
@@ -216,9 +164,9 @@ Trigger `daily_bar.yml` manually via GitHub Actions → Run workflow. The dashbo
 
 ---
 
-## Bar Bot — How It Works
+## How the Dashboard Analysis Works
 
-1. `bar/pilotfetch.py` pulls the SSRS XML report (same endpoint as inventory).
+1. `bar/pilotfetch.py` pulls the SSRS XML report.
 2. `bar/analyse.py` infers which categories Sava tracks by scanning `pars.json` prefixes (`be-` → BEER, `wh-` → WHISKEY, etc.).
 3. For every PilotLive product in a tracked category, it looks up the matching par by normalised product name (lowercase, collapsed whitespace).
 4. It classifies each matched SKU as:
@@ -226,8 +174,7 @@ Trigger `daily_bar.yml` manually via GitHub Actions → Run workflow. The dashbo
    - 🟡 Low (30–70% par)
    - ✅ Healthy (≥70% par)
    - ⚠️ Variance (soh < −5, likely count error)
-5. Unmatched products in well-tracked categories (≥3 par entries on Sava's sheet) appear under "🆕 NEW PRODUCTS — Add to bar count sheet".
-6. Par-sheet products with no par value appear under "❓ PAR MISSING — Set par levels".
-7. Brief is chunked on newline boundaries at 4000 chars and sent to every recipient in `bar/config.py` `RECIPIENTS`.
+5. Unmatched products in well-tracked categories (≥3 par entries on Sava's sheet) appear under the dashboard's Admin tab as "new products — add to bar count sheet".
+6. Par-sheet products with no par value appear under the Admin tab as "par missing — set par levels".
 
 **Updating bar pars:** open `bar/pars.json`, change the value for the product name, commit. Next run picks it up.
