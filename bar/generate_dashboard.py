@@ -1092,7 +1092,7 @@ body {{
 }}
 .search-bar:focus-within {{ border-color: var(--ink); box-shadow: 0 0 0 3px rgba(28,24,21,0.08); }}
 .search-bar::before {{
-  content: "\2315";
+  content: "\\2315";
   color: var(--ink-mute);
   font-size: 18px;
   line-height: 1;
@@ -1358,7 +1358,7 @@ body {{
   align-items: center;
   gap: 10px;
 }}
-.order-btn::after {{ content: "\2192"; font-weight: 600; }}
+.order-btn::after {{ content: "\\2192"; font-weight: 600; }}
 .order-btn:hover {{ background: var(--action-hover); }}
 .order-btn:active {{ transform: translateY(1px); }}
 .order-btn-unset {{
