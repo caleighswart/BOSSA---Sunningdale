@@ -20,7 +20,7 @@ from html import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from analyse import load_data, analyse
-from config import CATEGORY_LABELS, CATEGORY_ORDER, CATEGORY_UNITS, SUPPLIERS
+from config import CATEGORY_LABELS, CATEGORY_ORDER, CATEGORY_UNITS, SUPPLIERS, load_pars
 
 
 # Mirror analyse.py's prefix → category mapping so we can group by category
@@ -330,7 +330,7 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
     """Render the Order selection tab HTML.
 
     Each row has a checkbox so users can hand-pick the items they want
-    to send into the Stock Order tab for batch ordering.
+    to send into the Place order tab for batch ordering.
     Supplier-level and global "select all" controls are included.
     """
     if not supplier_groups:
@@ -370,7 +370,7 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
         '  </label>'
         '  <button type="button" class="order-btn order-btn-secondary" '
         '          onclick="sendSelectionToStockOrder()">'
-        '    Send selected to Stock Order'
+        '    Send selected to Place order'
         '  </button>'
         '</div>'
     )
@@ -520,32 +520,87 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
     return html
 
 
-def _stock_order_tab(all_rows: list, today_iso: str) -> str:
-    """Render the Stock Order tab.
+def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
+    """Render the Place order tab.
 
     Two entry paths:
-      1. Batch: items selected on the Order selection tab arrive here for review.
-      2. Manual: a single-product order form for ad-hoc requests.
+      1. Ad-hoc: a single-product form for one-off orders (primary, top of tab).
+      2. Batch: items selected on the Order selection tab arrive here for review.
+
+    Catalogue is the union of every par-sheet product (pars.json) and every
+    product PilotLive returned today — so Sava can order anything in the bar
+    catalogue, not just items currently below par.
     """
-    seen = set()
-    products = []
+    catalogue: dict[str, str] = {}
+    for par_name in pars:
+        nice = _nice(par_name)
+        if nice in catalogue:
+            continue
+        cat_code = _cat_from_par_name(par_name)
+        label = CATEGORY_LABELS.get(cat_code, "") if cat_code else ""
+        catalogue[nice] = label
     for label, item, _status in all_rows:
         nice = _nice(item["name"])
-        if nice in seen:
-            continue
-        seen.add(nice)
-        products.append((nice, label))
-    products.sort(key=lambda x: x[0].lower())
+        if nice not in catalogue:
+            catalogue[nice] = label
 
-    options = '<option value="">Select a product…</option>\n'
+    products = sorted(catalogue.items(), key=lambda x: x[0].lower())
+
+    options = ""
     for name, label in products:
-        options += (
-            f'<option value="{escape(name)}">'
-            f'{escape(name)} &middot; {escape(label)}'
-            f'</option>\n'
-        )
+        hint = f"{escape(name)} &middot; {escape(label)}" if label else escape(name)
+        options += f'<option value="{escape(name)}">{hint}</option>\n'
 
     return f"""
+<div class="order-form-card">
+  <h3 class="section-title">Place an ad-hoc order</h3>
+  <p class="form-help">Order any product in the bar catalogue — opens your email client ready to send. Start typing the product name to search.</p>
+
+  <form id="stock-order-form" class="order-form" onsubmit="submitStockOrder(event)">
+    <div class="form-row">
+      <label for="order-date">Order date</label>
+      <input type="date" id="order-date" name="date" value="{today_iso}" required>
+    </div>
+
+    <div class="form-row">
+      <label for="order-item">Stock item</label>
+      <input type="text" id="order-item" name="item" list="ad-hoc-products" autocomplete="off" placeholder="Type to search…" required>
+      <datalist id="ad-hoc-products">
+        {options}
+      </datalist>
+    </div>
+
+    <div class="form-row">
+      <label for="order-qty">Quantity</label>
+      <input type="number" id="order-qty" name="qty" min="1" step="1" placeholder="e.g. 12" required>
+    </div>
+
+    <div class="form-row">
+      <label for="order-email">Supplier email</label>
+      <input type="email" id="order-email" name="email" value="hello@makematicai.com" data-email-default="hello@makematicai.com" placeholder="supplier@example.com" required>
+      <span class="form-hint">Defaults to the address set in <strong>Order email settings</strong> (Order selection tab). The confirmation will open in your email client ready to send.</span>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="order-btn">Submit order</button>
+    </div>
+  </form>
+
+  <div id="order-confirmation" class="order-confirmation" hidden>
+    <div class="confirmation-title">Order submitted — ready to send.</div>
+    <div class="confirmation-details">
+      <div><span>Date</span><strong id="conf-date"></strong></div>
+      <div><span>Item</span><strong id="conf-item"></strong></div>
+      <div><span>Quantity</span><strong id="conf-qty"></strong></div>
+      <div><span>Sent to</span><strong id="conf-email"></strong></div>
+    </div>
+    <p class="confirmation-note">An email draft has opened with the order ready to send. Check the recipient is correct, then send.</p>
+    <div class="form-actions">
+      <button type="button" class="order-btn order-btn-secondary" onclick="resetStockOrder()">Place another order</button>
+    </div>
+  </div>
+</div>
+
 <div class="order-form-card batch-order-card">
   <h3 class="section-title">Review &amp; send selected reorder items</h3>
   <p class="form-help">Items you ticked on the <strong>Order selection</strong> tab show up here. Adjust quantities if needed, then send the batch by email grouped by supplier.</p>
@@ -582,54 +637,6 @@ def _stock_order_tab(all_rows: list, today_iso: str) -> str:
   <div class="batch-sticky-actions">
     <button type="button" class="order-btn order-btn-secondary" onclick="clearBatchSelection()">Clear selection</button>
     <button type="button" class="order-btn" onclick="sendAllBatchGroups()">Send batch via email</button>
-  </div>
-</div>
-
-<div class="order-form-card">
-  <h3 class="section-title">Place a single ad-hoc order</h3>
-  <p class="form-help">Need something not flagged on the Order selection tab? Use this form to submit a one-off order — opens your email client ready to send.</p>
-
-  <form id="stock-order-form" class="order-form" onsubmit="submitStockOrder(event)">
-    <div class="form-row">
-      <label for="order-date">Order date</label>
-      <input type="date" id="order-date" name="date" value="{today_iso}" required>
-    </div>
-
-    <div class="form-row">
-      <label for="order-item">Stock item</label>
-      <select id="order-item" name="item" required>
-        {options}
-      </select>
-    </div>
-
-    <div class="form-row">
-      <label for="order-qty">Quantity</label>
-      <input type="number" id="order-qty" name="qty" min="1" step="1" placeholder="e.g. 12" required>
-    </div>
-
-    <div class="form-row">
-      <label for="order-email">Supplier email</label>
-      <input type="email" id="order-email" name="email" value="hello@makematicai.com" data-email-default="hello@makematicai.com" placeholder="supplier@example.com" required>
-      <span class="form-hint">Defaults to the address set in <strong>Order email settings</strong> (Order selection tab). The confirmation will open in your email client ready to send.</span>
-    </div>
-
-    <div class="form-actions">
-      <button type="submit" class="order-btn">Submit order</button>
-    </div>
-  </form>
-
-  <div id="order-confirmation" class="order-confirmation" hidden>
-    <div class="confirmation-title">Order submitted — ready to send.</div>
-    <div class="confirmation-details">
-      <div><span>Date</span><strong id="conf-date"></strong></div>
-      <div><span>Item</span><strong id="conf-item"></strong></div>
-      <div><span>Quantity</span><strong id="conf-qty"></strong></div>
-      <div><span>Sent to</span><strong id="conf-email"></strong></div>
-    </div>
-    <p class="confirmation-note">An email draft has opened with the order ready to send. Check the recipient is correct, then send.</p>
-    <div class="form-actions">
-      <button type="button" class="order-btn order-btn-secondary" onclick="resetStockOrder()">Place another order</button>
-    </div>
   </div>
 </div>
 """
@@ -720,7 +727,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     total_order = sum(len(g["critical"]) + len(g["low"]) for g in supplier_groups)
 
     # ── Stock Order tab ───────────────────────────────────────────────────────
-    stock_order_tab = _stock_order_tab(all_rows, brief_date)
+    stock_order_tab = _stock_order_tab(all_rows, load_pars(), brief_date)
 
     # ── Build tab content strings ─────────────────────────────────────────────
     crit_tab    = _grouped_stock_table(crit_rows, sort_mode="severity")
@@ -2138,7 +2145,7 @@ code {{
   </div>
   <div class="chip-group" data-section="orders" hidden>
     <button class="tab-btn chip" data-tab="orders">By supplier <span class="count c-order">{total_order}</span></button>
-    <button class="tab-btn chip" data-tab="stock-order">Review batch <span class="count c-batch" id="batch-count-badge" hidden>0</span></button>
+    <button class="tab-btn chip" data-tab="stock-order">Place order <span class="count c-batch" id="batch-count-badge" hidden>0</span></button>
     <button class="tab-btn chip" data-tab="history">History <span class="count c-hist" id="history-count-badge" hidden>0</span></button>
   </div>
   <div class="chip-group" data-section="admin" hidden>
@@ -2162,7 +2169,7 @@ code {{
       <h3 class="section-title">Order history</h3>
       <p class="admin-note">Orders sent by email are saved in this browser. Update each order's status as it moves through the supplier (sent → confirmed → received).</p>
     </div>
-    <p class="empty" id="history-empty">No orders sent yet. When you send a batch from the <strong>Stock Order</strong> tab, it'll appear here.</p>
+    <p class="empty" id="history-empty">No orders sent yet. When you send an order from the <strong>Place order</strong> tab, it'll appear here.</p>
     <div id="history-list"></div>
     <div class="history-footer" id="history-footer" hidden>
       <button type="button" class="order-btn order-btn-secondary" onclick="clearOrderHistory()">Clear local history</button>
@@ -2570,7 +2577,7 @@ code {{
   function sendSelectionToStockOrder() {{
     const picked = selectedReorder();
     if (picked.length === 0) {{
-      alert('Tick at least one item to send to the Stock Order tab.');
+      alert('Tick at least one item to send to the Place order tab.');
       return;
     }}
     prefillAdhocFromSelection(picked[0]);
@@ -2583,21 +2590,7 @@ code {{
     const qtyInp   = document.getElementById('order-qty');
     const emailInp = document.getElementById('order-email');
     if (itemSel) {{
-      const name = cb.dataset.name || '';
-      const label = cb.dataset.cat || '';
-      let option = Array.from(itemSel.options).find(o => o.value === name);
-      if (!option && name) {{
-        option = document.createElement('option');
-        option.value = name;
-        option.textContent = name + ' · ' + label;
-        itemSel.add(option, itemSel.options[1] || null);
-      }}
-      if (option) {{
-        option.selected = true;
-        itemSel.value = name;
-      }} else {{
-        itemSel.value = '';
-      }}
+      itemSel.value = cb.dataset.name || '';
     }}
     if (qtyInp) {{
       const needed = parseInt(cb.dataset.needed, 10);
