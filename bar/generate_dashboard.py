@@ -1599,9 +1599,25 @@ body {{
 .batch-group-title {{ font-weight: 700; color: var(--ink); font-size: 18px; letter-spacing: -0.005em; }}
 .batch-group-meta {{ font-size: 13px; color: var(--ink-mute); font-weight: 500; }}
 .batch-items {{ display: grid; gap: 6px; }}
+.batch-items-head {{
+  display: grid;
+  grid-template-columns: 1.6fr 72px 72px 110px 84px 36px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 14px 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  border-bottom: 1px solid var(--line-soft);
+}}
+.batch-items-head > div {{ text-align: center; }}
+.batch-items-head > div:first-child {{ text-align: left; }}
 .batch-item {{
   display: grid;
-  grid-template-columns: 1fr 90px 90px auto;
+  grid-template-columns: 1.6fr 72px 72px 110px 84px 36px;
   gap: 12px;
   align-items: center;
   background: var(--bg-soft);
@@ -1611,7 +1627,30 @@ body {{
   font-size: 15px;
 }}
 .batch-item-name {{ color: var(--ink); font-weight: 600; }}
-.batch-item-meta {{ color: var(--ink-mute); font-size: 12px; text-align: right; font-weight: 500; }}
+.batch-item-meta {{ color: var(--ink-mute); font-size: 12px; text-align: center; font-weight: 500; }}
+.batch-item-meta-compact {{
+  display: none;
+  color: var(--ink-mute);
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 2px;
+}}
+.batch-item-stock,
+.batch-item-par {{
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+}}
+.batch-item-unit {{
+  color: var(--ink-mute);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}}
+.batch-item[data-status="critical"] .batch-item-stock {{ color: var(--crit); }}
+.batch-item[data-status="low"] .batch-item-stock {{ color: var(--warn, #B47A1F); }}
 .batch-item input[type="number"] {{
   font-family: var(--mono);
   font-size: 15px;
@@ -1772,7 +1811,16 @@ code {{
   .history-order-summary .history-meta {{ grid-column: 1 / -1; }}
   .history-order-summary .history-status {{ grid-column: 1; }}
   .history-order-summary .history-view-btn {{ grid-column: 2; justify-self: end; }}
-  .batch-item {{ grid-template-columns: 1fr auto auto auto; }}
+  .batch-items-head {{ grid-template-columns: 1.4fr 60px 60px 96px 70px 30px; font-size: 10.5px; gap: 8px; }}
+  .batch-item {{ grid-template-columns: 1.4fr 60px 60px 96px 70px 30px; gap: 8px; }}
+}}
+@media (max-width: 720px) {{
+  .batch-items-head {{ display: none; }}
+  .batch-item {{ grid-template-columns: 1fr 96px auto; gap: 10px; }}
+  .batch-item .batch-item-stock,
+  .batch-item .batch-item-par,
+  .batch-item .batch-item-unit {{ display: none; }}
+  .batch-item .batch-item-meta-compact {{ display: block; }}
 }}
 @media (max-width: 720px) {{
   :root {{ --gutter: 16px; }}
@@ -2641,22 +2689,35 @@ code {{
         let itemsHtml = '';
         entries.forEach(({{ it, ii }}) => {{
           const safeName = it.name.replace(/"/g, '&quot;');
+          const statusAttr = it.status ? ' data-status="' + it.status + '"' : '';
           itemsHtml += '' +
-            '<div class="batch-item" data-gi="' + gi + '" data-ii="' + ii + '">' +
+            '<div class="batch-item" data-gi="' + gi + '" data-ii="' + ii + '"' + statusAttr + '>' +
               '<div class="batch-item-name">' + safeName +
-                '<div class="batch-item-meta">have ' + it.soh + ' / par ' + it.par + '</div>' +
+                '<div class="batch-item-meta-compact">' + it.soh + ' / ' + it.par + ' ' + it.unit + '</div>' +
               '</div>' +
-              '<input type="number" min="1" step="1" value="' + it.needed + '" aria-label="Quantity">' +
-              '<div class="batch-item-meta">' + it.unit + '</div>' +
+              '<div class="batch-item-stock" aria-label="In stock">' + it.soh + '</div>' +
+              '<div class="batch-item-par" aria-label="Par">' + it.par + '</div>' +
+              '<input type="number" min="1" step="1" value="' + it.needed + '" aria-label="Order quantity">' +
+              '<div class="batch-item-unit">' + it.unit + '</div>' +
               '<button type="button" class="batch-item-remove" aria-label="Remove">&times;</button>' +
             '</div>';
         }});
+        const headerRow = '' +
+          '<div class="batch-items-head" aria-hidden="true">' +
+            '<div>Product</div>' +
+            '<div>In stock</div>' +
+            '<div>Par</div>' +
+            '<div>Order qty</div>' +
+            '<div>Unit</div>' +
+            '<div></div>' +
+          '</div>';
         catsHtml += '' +
           '<details class="cat-section" open>' +
             '<summary class="cat-summary">' +
               '<span class="cat-summary-name">' + cat + '</span>' +
               '<span class="cat-summary-count">' + entries.length + '</span>' +
             '</summary>' +
+            headerRow +
             '<div class="batch-items">' + itemsHtml + '</div>' +
           '</details>';
       }});
