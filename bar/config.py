@@ -72,6 +72,22 @@ CATEGORY_UNITS = {
     "PACKAGING":   "Units",
 }
 
+# ── DRAUGHT KEG SIZING ────────────────────────────────────────────────────────
+# Draught stock is counted in litres but ORDERED by the keg. To turn a litre
+# shortfall into an order, divide by the keg size and round up to whole kegs.
+# All current draught lines are 30L; override a specific product here if a
+# supplier ships a different size (e.g. Leffe 20L, Castle 50L). Keys are the
+# normalised PilotLive product name (lowercase, single-spaced).
+DRAUGHT_KEG_LITRES_DEFAULT = 30
+DRAUGHT_KEG_LITRES_BY_PRODUCT: dict[str, int] = {}
+
+
+def keg_litres(product_name: str) -> int:
+    """Litres per keg for a draught product (default 30L)."""
+    key = " ".join(product_name.lower().split())
+    return DRAUGHT_KEG_LITRES_BY_PRODUCT.get(key, DRAUGHT_KEG_LITRES_DEFAULT)
+
+
 # ── SUPPLIERS ─────────────────────────────────────────────────────────────────
 # One entry per category. If multiple categories share a supplier, give them
 # the same 'email' address — they will be merged into one order card.

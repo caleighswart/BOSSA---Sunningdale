@@ -20,7 +20,7 @@ from html import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from analyse import load_data, analyse
-from config import CATEGORY_LABELS, CATEGORY_ORDER, CATEGORY_UNITS, SUPPLIERS, load_pars
+from config import CATEGORY_LABELS, CATEGORY_ORDER, CATEGORY_UNITS, SUPPLIERS, keg_litres, load_pars
 
 
 # Mirror analyse.py's prefix → category mapping so we can group by category
@@ -46,6 +46,24 @@ def _cat_from_par_name(name: str) -> str:
 def _unit(cat: str) -> str:
     """Return the display unit for a category (Litres / Bottles / Units)."""
     return CATEGORY_UNITS.get(cat, "Units")
+
+
+def _order_qty(item: dict, cat_code: str) -> tuple[int, str, str, int]:
+    """Order quantity for a low/critical item.
+
+    Returns (qty, order_unit, display, keg_litres). Draught is counted in
+    litres but ordered by the keg, so its shortfall is rounded up to whole 30L
+    kegs and shown as e.g. "1 keg (30L)". Everything else keeps the existing
+    litre/bottle/unit top-up (ceil(par - soh)).
+    """
+    deficit = item["par"] - item["soh"]
+    if cat_code == "DRAUGHT":
+        kl   = keg_litres(item["name"])
+        kegs = max(1, int(deficit / kl + 0.9999))
+        word = "keg" if kegs == 1 else "kegs"
+        return kegs, "kegs", f"{kegs} {word} ({kegs * kl}L)", kl
+    qty = max(0, int(deficit + 0.9999))
+    return qty, _unit(cat_code), str(qty), 0
 
 
 def _cat_from_label(label: str) -> str:
@@ -436,7 +454,8 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
                 name     = escape(raw_name)
                 soh      = _fmt(item["soh"])
                 par      = _fmt(item["par"])
-                needed   = max(0, int(item["par"] - item["soh"] + 0.9999))
+                # Draught orders in kegs; everything else in its stock unit.
+                qty, order_unit, qty_display, keg_l = _order_qty(item, cat_code)
                 status   = "critical" if pct < 0.30 else "low"
                 tbl += (
                     f'<tr class="row-{status}">'
@@ -446,7 +465,9 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
                     f'data-name="{name}" '
                     f'data-cat="{escape(_label)}" '
                     f'data-unit="{escape(unit)}" '
-                    f'data-soh="{soh}" data-par="{par}" data-needed="{needed}" '
+                    f'data-order-unit="{escape(order_unit)}" '
+                    f'data-keg-litres="{keg_l}" '
+                    f'data-soh="{soh}" data-par="{par}" data-needed="{qty}" '
                     f'data-status="{status}" '
                     f'data-supplier="{sup_name_attr}" '
                     f'data-email="{email_attr}" '
@@ -456,7 +477,7 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
                     f'<td class="num">{soh}</td>'
                     f'<td class="num">{par}</td>'
                     f'<td class="unit-cell">{escape(unit)}</td>'
-                    f'<td class="num order-qty">{needed}</td>'
+                    f'<td class="num order-qty">{escape(qty_display)}</td>'
                     f'<td class="fill-col">{_pct_bar(pct)}</td>'
                     f'</tr>'
                 )
@@ -2615,13 +2636,15 @@ code {{
         }});
       }}
       groups.get(key).items.push({{
-        name:    cb.dataset.name,
-        cat:     cb.dataset.cat,
-        unit:    cb.dataset.unit,
-        soh:     cb.dataset.soh,
-        par:     cb.dataset.par,
-        needed:  parseInt(cb.dataset.needed, 10) || 1,
-        status:  cb.dataset.status,
+        name:      cb.dataset.name,
+        cat:       cb.dataset.cat,
+        unit:      cb.dataset.unit,
+        orderUnit: cb.dataset.orderUnit || cb.dataset.unit,
+        kegLitres: parseInt(cb.dataset.kegLitres, 10) || 0,
+        soh:       cb.dataset.soh,
+        par:       cb.dataset.par,
+        needed:    parseInt(cb.dataset.needed, 10) || 1,
+        status:    cb.dataset.status,
       }});
     }});
     return Array.from(groups.values());
@@ -2691,7 +2714,7 @@ code {{
               '<div class="batch-item-stock" aria-label="In stock">' + it.soh + '</div>' +
               '<div class="batch-item-par" aria-label="Par">' + it.par + '</div>' +
               '<input type="number" min="1" step="1" value="' + it.needed + '" aria-label="Order quantity">' +
-              '<div class="batch-item-unit">' + it.unit + '</div>' +
+              '<div class="batch-item-unit">' + (it.kegLitres ? (it.orderUnit + ' (' + (it.needed * it.kegLitres) + 'L)') : it.orderUnit) + '</div>' +
               '<button type="button" class="batch-item-remove" aria-label="Remove">&times;</button>' +
             '</div>';
         }});
@@ -2748,6 +2771,23 @@ code {{
         if (match) match.checked = false;
         onReorderChange();
         renderBatchPanel();
+      }});
+    }});
+
+    // Draught is ordered in kegs — keep the "(NL)" litre total beside the qty
+    // input in sync as the keg count is edited.
+    const liveGroups = JSON.parse(wrap.dataset.groups);
+    wrap.querySelectorAll('.batch-item').forEach(row => {{
+      const gi = parseInt(row.dataset.gi, 10);
+      const ii = parseInt(row.dataset.ii, 10);
+      const it = liveGroups[gi] && liveGroups[gi].items[ii];
+      if (!it || !it.kegLitres) return;
+      const input    = row.querySelector('input[type="number"]');
+      const unitCell = row.querySelector('.batch-item-unit');
+      if (!input || !unitCell) return;
+      input.addEventListener('input', () => {{
+        const k = Math.max(1, parseInt(input.value, 10) || 1);
+        unitCell.textContent = it.orderUnit + ' (' + (k * it.kegLitres) + 'L)';
       }});
     }});
   }}
@@ -2848,7 +2888,11 @@ code {{
     byCat.forEach((catItems, cat) => {{
       body += cat + '\\n';
       catItems.forEach(it => {{
-        body += '- ' + it.name + ' \u2014 ' + it.needed + '\\n';
+        // Draught is ordered by the keg \u2014 spell out kegs + litre total.
+        const qtyStr = it.kegLitres
+          ? (it.needed + ' keg' + (it.needed === 1 ? '' : 's') + ' (' + (it.needed * it.kegLitres) + 'L)')
+          : it.needed;
+        body += '- ' + it.name + ' \u2014 ' + qtyStr + '\\n';
       }});
       body += '\\n';
     }});
@@ -2870,7 +2914,7 @@ code {{
       items: items.map(it => ({{
         name:   it.name,
         qty:    it.needed,
-        unit:   it.unit,
+        unit:   it.orderUnit || it.unit,
         status: it.status
       }})),
       status: 'sent',
