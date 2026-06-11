@@ -140,6 +140,37 @@ def load_pars() -> dict[str, float | None]:
         return json.load(f)
 
 
+# ── FRONT / BACK STOCK COUNTS ─────────────────────────────────────────────────
+# PilotLive's SSRS feed only exposes ONE combined stock-on-hand per product
+# (bar + storeroom together). The front (in-bar) vs back (storeroom) split lives
+# only on the managers' daily prep-sheet count, which is not on the report
+# server. So we keep that split in bar/front_back.json, maintained from the
+# count (or a prep-sheet export); the dashboard renders it as Back/Front
+# columns inside the stock tabs (Critical, Low, Healthy, All products). Schema:
+#   {
+#     "_as_of": "YYYY-MM-DD" | null,        # date the counts were taken
+#     "<pilotlive product name>": {"back": <num>, "front": <num>},
+#     ...
+#   }
+# Keys match pars.json (PilotLive product names). A missing file or missing
+# product is fine — those rows render "—" until counted.
+_FRONT_BACK_PATH = os.path.join(os.path.dirname(__file__), "front_back.json")
+
+
+def load_front_back() -> dict:
+    """Return the raw front/back counts dict from front_back.json.
+
+    Returns an empty dict if the file is absent or unreadable so the dashboard
+    still builds (the Front & Back tab just shows blank back/front columns).
+    """
+    try:
+        with open(_FRONT_BACK_PATH, "r") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (FileNotFoundError, ValueError):
+        return {}
+
+
 # Products where we intentionally want to suppress "missing par" flagging
 # (e.g. packaging & vapes that haven't been counted on the sheet).
 # Leave empty for now — all missing pars will surface in the brief's
