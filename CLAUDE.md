@@ -31,6 +31,30 @@ Telegram secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BAR_BOT_TOKEN`) can be deleted
 
 ---
 
+## How We Use the Dashboard — Boundaries (locked)
+
+These are hard limits set by the managers (voice note, 2026-06-19). The dashboard is a
+**read-only mirror + order assistant** — it never acts on the managers' process. Do not
+build anything that crosses these lines without an explicit new instruction:
+
+1. **Front/Back stock is display-only.** The dashboard reflects the managers' own manual
+   count back at them; it never writes to, syncs to, or auto-fills the prep sheet. Managers
+   keep full ownership of fills, fill-checking, and stock-checking. (Auto-filling the prep
+   sheet was explicitly rejected — "it'll make ridiculous errors and management complacency.")
+2. **Data flow is one-directional:** managers' manual prep sheet → periodic snapshot →
+   `bar/front_back.json` → dashboard display. Never dashboard → prep sheet.
+3. **Orders stay human-in-the-loop.** The dashboard may pre-calculate and pre-fill an order,
+   but a manager always reviews it before it's sent — "it can do the orders, but it must
+   first give you a prompt you can look at before it gets processed." This is already how the
+   "Send batch via email" button works (opens a `mailto:` draft the manager sends manually;
+   the `BOSSA_ORDERS_WEBHOOK` only logs a copy *after* sending). Keep it that way.
+
+Front/back data is collected by **piggybacking on the managers' existing stock-take** (no new
+daily ask) — whenever they do their regular count, they share a snapshot and it's transcribed
+into `bar/front_back.json` with an `_as_of` date. See "Front & Back stock" below.
+
+---
+
 ## Credentials & Secrets
 
 | What | Where | Value |

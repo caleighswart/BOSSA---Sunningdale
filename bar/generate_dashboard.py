@@ -724,16 +724,18 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
 def _fb_caption(as_of, has_counts: bool) -> str:
     """Slim caption shown above the Back/Front columns explaining their source.
 
-    Back/Front come from the daily count (bar/front_back.json), not from
-    PilotLive (whose feed only gives one combined SOH per product). The caption
-    surfaces the count date, or that no count is loaded yet.
+    Back/Front are a display-only mirror of the managers' own manual count
+    (bar/front_back.json) — the dashboard never writes back to the prep sheet.
+    They are not from PilotLive (whose feed only gives one combined SOH per
+    product). The caption surfaces the count date, or that no count is loaded yet.
     """
     if has_counts:
-        text = (f"Back / Front counts as of {escape(str(as_of))}" if as_of
-                else "Back / Front from the daily count")
+        text = (f"Back / Front — managers' count, {escape(str(as_of))} · display only "
+                "(SOH live from PilotLive)" if as_of
+                else "Back / Front — managers' count · display only (SOH live from PilotLive)")
     else:
-        text = ("Back / Front from the daily count — not loaded yet "
-                "(SOH is live from PilotLive)")
+        text = ("Back / Front — managers' count, not loaded yet · display only "
+                "(SOH live from PilotLive)")
     return f'<p class="fb-stamp">{text}</p>'
 
 
