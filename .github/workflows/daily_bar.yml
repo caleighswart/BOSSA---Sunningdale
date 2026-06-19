@@ -69,6 +69,17 @@ jobs:
           BOSSA_ORDERS_WEBHOOK:  ${{ secrets.BOSSA_ORDERS_WEBHOOK }}
         run: python generate_dashboard.py
 
+      # Fail loudly the same morning if a redesign dropped the hidden freshness
+      # marker the health check depends on, instead of letting health_check.yml
+      # discover it days later as a false alarm. (See Known Issues 2026-06-19.)
+      - name: Verify freshness marker present
+        run: |
+          if ! grep -q '<meta name="dashboard-generated"' docs/index.html; then
+            echo "::error::docs/index.html is missing the dashboard-generated meta tag — health_check.yml depends on it. A redesign likely dropped it; re-add it in bar/generate_dashboard.py <head>."
+            exit 1
+          fi
+          echo "✅ dashboard-generated marker present."
+
       - name: Commit dashboard for Netlify deploy
         run: |
           git config user.name "github-actions[bot]"

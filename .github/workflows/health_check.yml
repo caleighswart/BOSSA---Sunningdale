@@ -14,13 +14,19 @@ name: Bossa Sunningdale — Daily Dashboard Health Check
 # Hard failures (fetch error, parse error, recovery failed) still open an
 # issue, fail the workflow, and trigger the standard failure email.
 #
-# Cron: 09:33 UTC = 11:33 SAST. Sized to fire well after both scheduled
-# daily_bar.yml runs (03:13 UTC and 05:17 UTC targets) have had time to
-# complete given typical 4-5h GH Actions cron delays.
+# Crons: two slots so GitHub silently dropping one (a known platform issue —
+# the same reason daily_bar.yml runs two) still leaves a check for the day.
+#   Primary : 09:33 UTC = 11:33 SAST
+#   Backup  : 11:33 UTC = 13:33 SAST
+# Both are sized to fire well after both scheduled daily_bar.yml runs (03:13 UTC
+# and 05:17 UTC targets) have had time to complete given typical 4-5h GH Actions
+# cron delays. A second run on a healthy day just re-prints "Healthy" and exits 0;
+# same-title/same-date issue dedup prevents duplicate issues on a failing day.
 
 on:
   schedule:
-    - cron: '33 9 * * *'
+    - cron: '33 9 * * *'    # 11:33 SAST — primary
+    - cron: '33 11 * * *'   # 13:33 SAST — backup, in case GitHub drops the primary cron
   workflow_dispatch:
 
 permissions:
