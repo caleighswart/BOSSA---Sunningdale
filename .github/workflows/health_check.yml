@@ -140,30 +140,30 @@ jobs:
                   problems.append(f"Could not fetch dashboard at {dashboard_url}: {e}")
 
           if html:
+              # Freshness is read from a machine-readable marker the generator
+              # emits (a <meta name="dashboard-generated"> tag carrying a TZ-aware
+              # ISO timestamp). This is decoupled from the visual template so a
+              # dashboard redesign can't silently break the monitor.
               m = re.search(
-                  r'Updated\s+(\d+)\s+(\w+)\s+(\d{4}),\s+(\d{2}):(\d{2})\s+SAST',
+                  r'<meta name="dashboard-generated" content="([^"]+)"',
                   html,
               )
               if not m:
                   problems.append(
-                      "Couldn't find `Updated <date>` line in dashboard HTML — "
-                      "template may have changed."
+                      "Couldn't find `dashboard-generated` meta tag in dashboard HTML — "
+                      "generator may have changed."
                   )
               else:
-                  day, mon, year, hh, mm = m.groups()
                   try:
-                      dashboard_dt = datetime.strptime(
-                          f"{day} {mon} {year} {hh}:{mm}",
-                          "%d %b %Y %H:%M",
-                      ).replace(tzinfo=SAST)
+                      dashboard_dt = datetime.fromisoformat(m.group(1)).astimezone(SAST)
                       if dashboard_dt.date() != today_sast:
                           problems.append(
-                              f"Dashboard timestamp is **{dashboard_dt.strftime('%d %b %Y %H:%M SAST')}** "
+                              f"Dashboard generated **{dashboard_dt.strftime('%d %b %Y %H:%M SAST')}** "
                               f"but today (SAST) is **{today_str}**. "
                               f"Likely Netlify did not deploy the latest commit."
                           )
                   except ValueError as e:
-                      problems.append(f"Couldn't parse dashboard timestamp: {e}")
+                      problems.append(f"Couldn't parse dashboard-generated timestamp: {e}")
 
           # ── 3. Healthy → exit ────────────────────────────────────────────────
           if not problems and not recoveries:

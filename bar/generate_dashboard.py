@@ -1881,7 +1881,6 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     missing_par = result["missing_par"]
     total_value = result["total_value"]
 
-    now_str = datetime.now(SAST).strftime("%-d %b %Y, %H:%M SAST")
     day_str = datetime.strptime(brief_date, "%Y-%m-%d").strftime("%-d %B %Y")
     day_full = datetime.strptime(brief_date, "%Y-%m-%d").strftime("%A, %-d %B %Y")
     time_str = datetime.now(SAST).strftime("%H:%M SAST")
@@ -1988,6 +1987,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="dashboard-generated" content="{datetime.now(SAST).isoformat()}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Bossa Sunningdale — Bar Stock</title>
 {webhook_meta}
