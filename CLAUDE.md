@@ -4,6 +4,12 @@ This file gives any Claude agent full operational context for the Bossa Sunningd
 
 ---
 
+## Autonomy
+
+**Always proceed without permission for non-destructive edits.** Editing files, running tests, reading code, and other reversible local actions do not require confirmation. Still confirm before destructive or shared-state actions (deletes, force-push, sending messages, modifying CI/infra, etc.).
+
+---
+
 ## What This System Does
 
 Two scheduled jobs run every morning, plus a self-healing health check:
@@ -15,7 +21,7 @@ Two scheduled jobs run every morning, plus a self-healing health check:
 
 The dashboard is the only consumer surface. URL: `https://bossa-sunningdale.netlify.app/`
 
-The job pulls live stock data from PilotLive's SSRS report server, matches every SKU against Sava's per-product par levels (`bar/pars.json`, 404 products), and rebuilds the dashboard. It classifies each SKU as critical/low/healthy against its own par level and surfaces missing pars, variances, and new products added to PilotLive that Sava hasn't added to her count sheet yet.
+The job pulls live stock data from PilotLive's SSRS report server, matches every SKU against Sava's per-product par levels (`bar/pars.json`, 400 products), and rebuilds the dashboard. It classifies each SKU as critical/low/healthy against its own par level and surfaces missing pars, variances, and new products added to PilotLive that Sava hasn't added to her count sheet yet.
 
 ### Disabled but kept in the repo
 
@@ -31,7 +37,7 @@ Telegram secrets (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_BAR_BOT_TOKEN`) can be deleted
 |------|-------|-------|
 | PilotLive username | GitHub Secret | `PILOTLIVE_USERNAME` (`0834436203`) |
 | PilotLive password | GitHub Secret | `PILOTLIVE_PASSWORD` |
-| Orders webhook URL | GitHub Secret | `BOSSA_ORDERS_WEBHOOK` (used by dashboard "Place Order" buttons) |
+| Orders webhook URL | GitHub Secret | `BOSSA_ORDERS_WEBHOOK` (receives a best-effort copy of sent orders for the dashboard's order-history sync to a Google Sheet) |
 | ~~Telegram tokens~~ | ~~GitHub Secret~~ | Unused since 2026-05-13 — safe to delete from repo Settings |
 
 **GitHub Secrets location:** repo → Settings → Secrets and variables → Actions
@@ -54,7 +60,7 @@ bar/
   analyse.py            — Per-product par matching + brief builder
   pilotfetch.py         — SSRS fetch
   config.py             — Categories, thresholds, suppliers
-  pars.json             — 404 product → par mapping (from Sava's count sheet)
+  pars.json             — 400 product → par mapping (from Sava's count sheet)
   main.py               — DORMANT: old Telegram-send entrypoint (no longer run)
   requirements.txt
 
@@ -119,6 +125,7 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-05-13 | Dashboard wasn't updated by 08:30 SAST. Cron was `0 5 * * *` (07:00 SAST target) — a peak top-of-hour slot, and GitHub Actions consistently delayed the run by 1h 52m – 3h 24m, so it landed between 08:52 and 10:24 SAST. | Shifted cron to `13 3 * * *` (05:13 SAST target). Off-peak minute; even with typical 1–3h GH delay the run should land before 07:00 SAST. |
 | 2026-05-13 | Added daily dashboard health check (`health_check.yml`). First test fired at 09:13 SAST and (correctly) flagged that today's `daily_bar.yml` hadn't completed — empirically GH Actions delays the scheduled cron by 4-5h, not 1-3h, so the bar workflow typically lands 09:30–10:30 SAST. Health check at 09:13 SAST was inside the delay window and produced a false alarm. | Moved health check cron to `33 9 * * *` (11:33 SAST) to give a safe buffer past the worst observed delay. |
 | 2026-05-13 | GitHub silently dropped the scheduled `daily_bar.yml` cron entirely — no run fired at 03:13 UTC; by 10:05 SAST nothing was queued or in-progress for the day. Client needs the dashboard live every morning, so a single dropped cron = an outage. | (a) Added a backup cron at `17 5 * * *` (07:17 SAST target) so two independent slots have to be dropped to miss a day. (b) Extended `health_check.yml` to auto-trigger `daily_bar.yml` via `workflow_dispatch` when no successful run is found for today — opens an info issue (no email) on recovery so we still see when GH drops crons, but the dashboard self-heals by ~11:40 SAST in the worst case. |
+| 2026-06-19 | `health_check.yml` false-failed 7 days straight (issues #9–#15, daily emails) while the dashboard itself was fine. The v3 redesign (2026-06-11) changed the footer the freshness regex was reading, silently breaking the monitor. | (a) Generator emits a hidden `<meta name="dashboard-generated">` ISO-timestamp marker; health check parses that, not the visible footer (decoupled from the visual template). (b) Added a "Verify freshness marker present" step to `daily_bar.yml` that fails the run if the marker is ever dropped — catches a future redesign regression the same morning instead of days later. (c) Gave `health_check.yml` a redundant backup cron (`33 11 * * *` = 13:33 SAST) so GitHub dropping one cron no longer skips the day's check. |
 
 ---
 
@@ -133,7 +140,7 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 - **Change bar par levels:** edit `bar/pars.json` (keys = PilotLive product names)
 - **Change refresh time:** edit cron in `.github/workflows/daily_bar.yml` (UTC — SAST is UTC+2)
 - **Change bar stock thresholds:** edit `CRITICAL_PCT` / `LOW_PCT` in `bar/config.py`
-- **Add/update supplier details:** edit `SUPPLIERS` dict in `bar/config.py` (name, contact, whatsapp per category; same whatsapp number = merged into one order card)
+- **Add/update supplier details:** edit `SUPPLIERS` dict in `bar/config.py` (name, contact, email per category; same email = merged into one order card)
 - **Re-enable inventory or prep:** restore `schedule:` block in the relevant workflow file
 
 ---
@@ -151,7 +158,7 @@ Netlify watches the `main` branch and auto-deploys whenever `docs/index.html` is
 - Summary bar: critical count, low count, healthy count, total bar value
 - **Critical tab** — items below 30% par, sorted worst first
 - **Low tab** — items 30–70% par (watch list)
-- **Orders tab** — grouped by supplier with contact details, order quantities pre-calculated, and a "Place Order via WhatsApp" button that opens a pre-written order message
+- **Place order tab** — an ad-hoc single-product order form plus per-supplier batch ordering with quantities pre-calculated; a "Send batch via email" button opens a pre-filled email to the supplier
 - **All Products tab** — full list with colour-coded status pills and fill bars
 - **Variances tab** — negative SOH items to investigate
 - **Admin tab** — missing par levels + new PilotLive products not on Sava's sheet
