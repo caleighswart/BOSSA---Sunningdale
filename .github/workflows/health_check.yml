@@ -18,6 +18,12 @@ name: Bossa Sunningdale — Daily Dashboard Health Check
 # Hard failures (fetch error, parse error, recovery failed) still open an
 # issue, fail the workflow, and trigger the standard failure email.
 #
+# Separately, it polls Netlify build-minute usage (only if NETLIFY_API_TOKEN is
+# set) and warns BEFORE the monthly quota runs out — quota exhaustion suspends
+# all Netlify deploys and froze the live dashboard for 6 days in Jun 2026, and a
+# build hook can't fix it. ≥80% used → info issue (no email); ≥95% → hard
+# failure (email). Skipped silently if the token is unset.
+#
 # Crons: two slots so GitHub silently dropping one (a known platform issue —
 # the same reason daily_bar.yml runs two) still leaves a check for the day.
 #   Primary : 09:33 UTC = 11:33 SAST
@@ -50,6 +56,8 @@ jobs:
           GH_REPO:                ${{ github.repository }}
           DASHBOARD_URL:          https://bossa-sunningdale.netlify.app/
           NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
+          NETLIFY_API_TOKEN:      ${{ secrets.NETLIFY_API_TOKEN }}
+          NETLIFY_ACCOUNT_ID:     ${{ secrets.NETLIFY_ACCOUNT_ID }}
         run: |
           python3 - <<'EOF'
           import json
@@ -79,6 +87,7 @@ jobs:
 
           problems   = []   # hard failures → open issue, fail workflow
           recoveries = []   # auto-healed   → open info issue, exit 0
+          warnings   = []   # early warnings (build-credit) → info issue, exit 0
 
           # ── 1. Did daily_bar.yml complete successfully today? ────────────────
           out = gh(["gh", "run", "list",
@@ -208,8 +217,61 @@ jobs:
                   except ValueError as e:
                       problems.append(f"Couldn't parse dashboard-generated timestamp: {e}")
 
+          # ── 2b. Netlify build-credit early warning ───────────────────────────
+          # Build-minute exhaustion (not a code fault) caused the 6-day Jun 2026
+          # outage: at the monthly quota Netlify suspends ALL deploys, so pushes
+          # to main stop going live and a build hook can't help. Poll the
+          # account's build-minute usage and warn BEFORE the quota runs out.
+          # Optional: needs a Netlify PAT in NETLIFY_API_TOKEN; skipped if unset.
+          # A monitoring hiccup here must never fail the health check itself.
+          api_token = os.environ.get("NETLIFY_API_TOKEN", "")
+          if api_token:
+              try:
+                  def netlify_get(path):
+                      r = urllib.request.Request(
+                          f"https://api.netlify.com/api/v1/{path}",
+                          headers={"Authorization": f"Bearer {api_token}",
+                                   "User-Agent": "bossa-health-check/1"},
+                      )
+                      with urllib.request.urlopen(r, timeout=30) as resp:
+                          return json.loads(resp.read().decode("utf-8", errors="ignore"))
+
+                  account_id = os.environ.get("NETLIFY_ACCOUNT_ID", "")
+                  if not account_id:
+                      accounts = netlify_get("accounts")
+                      account_id = accounts[0]["id"] if accounts else ""
+
+                  if not account_id:
+                      print("ℹ️  Netlify usage check: no account found for token.")
+                  else:
+                      mins = (netlify_get(f"accounts/{account_id}/builds/status")
+                              .get("minutes", {}) or {})
+                      used     = float(mins.get("current", 0) or 0)
+                      included = float(mins.get("included_minutes_with_packs")
+                                       or mins.get("included_minutes", 0) or 0)
+                      if included > 0:
+                          pct = used / included * 100
+                          print(f"ℹ️  Netlify build minutes: {used:.0f}/{included:.0f} "
+                                f"({pct:.0f}%) this period.")
+                          usage = (f"Netlify build minutes at **{pct:.0f}%** "
+                                   f"({used:.0f}/{included:.0f} used this period). "
+                                   "At 100% Netlify suspends all deploys and the live "
+                                   "dashboard freezes — this caused the Jun 2026 outage.")
+                          if pct >= 95:
+                              problems.append(
+                                  usage + " **Imminent** — cut deploy frequency or "
+                                  "raise the quota now."
+                              )
+                          elif pct >= 80:
+                              warnings.append(
+                                  usage + " Heads-up to watch usage before the billing "
+                                  "period resets."
+                              )
+              except Exception as e:
+                  print(f"ℹ️  Could not check Netlify build usage: {e}")
+
           # ── 3. Healthy → exit ────────────────────────────────────────────────
-          if not problems and not recoveries:
+          if not problems and not recoveries and not warnings:
               print("✅ Healthy — dashboard refreshed today (SAST).")
               sys.exit(0)
 
@@ -223,11 +285,21 @@ jobs:
               if recoveries:
                   body_lines += ["", "Auto-recovered (informational):"]
                   body_lines += [f"- {r}" for r in recoveries]
+              if warnings:
+                  body_lines += ["", "Warnings:"]
+                  body_lines += [f"- {w}" for w in warnings]
           else:
-              title = f"ℹ️ Bar dashboard auto-recovered — {today_str}"
-              body_lines = ["GitHub Actions dropped a scheduled run; "
-                            "health check self-healed:"]
-              body_lines += [f"- {r}" for r in recoveries]
+              title = f"ℹ️ Bar dashboard notice — {today_str}"
+              body_lines = []
+              if recoveries:
+                  body_lines += ["Auto-recovered (GitHub dropped a scheduled run, "
+                                 "or Netlify deploy stalled):"]
+                  body_lines += [f"- {r}" for r in recoveries]
+              if warnings:
+                  if body_lines:
+                      body_lines += [""]
+                  body_lines += ["Warnings:"]
+                  body_lines += [f"- {w}" for w in warnings]
 
           body = (
               f"Health check on **{today_str}** (SAST):\n\n"
@@ -258,6 +330,6 @@ jobs:
               for p in problems:
                   print(f"::error::{p}")
               sys.exit(1)
-          print("✅ Auto-recovered — exiting 0.")
+          print("✅ Notice posted (no hard failure) — exiting 0.")
           sys.exit(0)
           EOF
