@@ -1,3 +1,11 @@
 [build]
   publish = "docs"
   command = ""
+
+# Serverless endpoints for the order confirm-receipt flow.
+# The functions self-register their clean URLs via `export const config =
+# { path: ... }` (Functions v2): confirm.mjs → /confirm, order-status.mjs →
+# /api/order-status. Both are same-origin, so the dashboard needs no CORS.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
