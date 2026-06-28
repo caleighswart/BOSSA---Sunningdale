@@ -96,6 +96,12 @@ inventory/               — DORMANT: workflow disabled, code untouched
 prep/                    — DORMANT: workflow disabled, code untouched
   main.py, pilotfetch.py, prep_engine.py, prep_config.py, requirements.txt
 
+netlify/functions/       — Serverless endpoints for the order confirm-receipt flow
+  confirm.mjs            — Supplier "confirm receipt" page (GET) + recorder (POST → Netlify Blobs)
+  order-status.mjs       — JSON read-back of confirmations for the dashboard (GET /api/order-status)
+netlify.toml            — Netlify config (publish=docs; functions dir)
+package.json            — @netlify/blobs dependency for the functions (repo's only Node code)
+
 PILOTLIVE_DATA_PULL.md  — Full SSRS technical reference
 CLAUDE.md               — This file
 ```
@@ -157,6 +163,7 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-06-27 | **Recovery confirmed** — the 2026-06-26 outage resolved itself on the credit reset exactly as predicted, no manual intervention needed. | Verified healthy: live `dashboard-generated` marker advanced to `2026-06-27T10:06 SAST` (was frozen on 2026-06-20 for 6 days) and matches `origin/main`; `daily_bar.yml` succeeded twice; `health_check.yml` ran green at 11:10 SAST — first pass in 5 days, no new issue/email. Closed the last leftover false-failure (issue #21, opened 26 Jun pre-reset) with a root-cause note. Confirms the diagnosis (Netlify build-credit exhaustion, not a code/generator/webhook fault). **Still open — structural:** the monthly quota ran out in the first place (likely early-June redesign deploys + redundant triggers, not the daily cron); keep deploys to one-per-day-on-change and avoid double-triggering (don't run Git auto-deploy *and* a per-push build hook) so it doesn't recur. The uncommitted per-push build-hook edits in `daily_bar.yml`/`health_check.yml` remain unshipped by design. |
 | 2026-06-28 | Finished the build-hook self-heal *properly* — the deferred half of the 2026-06-27 structural follow-up. | Shipped **only** the `health_check.yml` staleness-only path (commit `4f7cedf`): on a stale-live event it POSTs `NETLIFY_BUILD_HOOK_URL`, auto-recovers (info issue, no email), and falls back to a hard-fail alert if the POST errors. Fires rarely (only on detected staleness) so it adds **no** per-day credit burn. `daily_bar.yml`'s per-push hook stays **unshipped by design** (it would double credit burn). **Still pending (manual, owner-only):** create the build hook in the Netlify UI and set the `NETLIFY_BUILD_HOOK_URL` secret — until then the self-heal is inert and degrades gracefully (a stale event hard-fails with a "set the secret" message, same alert behaviour as before). ⚠️ Scope: this guards a genuine *Git-webhook stall* (the 2026-06-22 theory) — it does **not** help against Netlify **build-credit exhaustion** (the actual cause of the Jun outage), which only a usage/quota fix prevents. |
 | 2026-06-28 | Addressed the *actual* Jun-outage failure mode: Netlify build-credit exhaustion had no early warning — it only surfaced as a 6-day live-site freeze. | Added a **build-credit monitor** to `health_check.yml` (commit `a1da67a`): polls the Netlify account's build-minute usage each run and warns *before* the quota runs out — ≥80% used → info issue (no email), ≥95% → hard failure (email). Account auto-discovered from the token (override via `NETLIFY_ACCOUNT_ID`). Optional + graceful: needs a Netlify PAT in `NETLIFY_API_TOKEN`; skipped silently if unset, and any monitoring-API error is logged but never fails the health check. **Still pending (manual, owner-only):** create the Netlify PAT and set `NETLIFY_API_TOKEN` to activate. Unlike the build-hook self-heal, this targets the failure mode that actually took the site down. |
+| 2026-06-28 | **Feature (manager request):** Orders → History showed status only via a manual dropdown the manager set by hand, and the date group headers were small/muted (11px, all-caps, grey). | (a) Restyled the History date headers — sentence-case, 14px/700, dark ink (on-brand vs. the old muted all-caps; uppercase reserved for ≤11px labels per the v3 design system). (b) Added a **confirm-receipt link** to every order email (`/confirm?id=<order-uuid>`). When the *supplier* clicks it and presses "Confirm receipt", a **Netlify Function** (`netlify/functions/confirm.mjs`) records it to **Netlify Blobs**; the dashboard polls `/api/order-status` (`order-status.mjs`) on load + History-tab open and auto-advances that order `sent → confirmed` (shows a "Confirmed <time>" line). **Two-step GET-page→POST** so email link-scanners can't auto-confirm. Keeps the manual mailto send + the dropdown as an override; stays inside the locked order boundaries (manager still sends/reviews; only the supplier's own click flips status). **No new secret** (Blobs is auto-authed in the Functions runtime). Adds the repo's first Node code (`package.json` → `@netlify/blobs`, `netlify/functions/`) but **no extra daily build** and negligible invocations — safe under the build-credit constraint. See "Order Confirm-Receipt" section below. |
 
 ---
 
@@ -218,3 +225,41 @@ Trigger `daily_bar.yml` manually via GitHub Actions → Run workflow. The dashbo
 6. Par-sheet products with no par value appear under the Admin tab as "par missing — set par levels".
 
 **Updating bar pars:** open `bar/pars.json`, change the value for the product name, commit. Next run picks it up.
+
+---
+
+## Order Confirm-Receipt (auto-status)
+
+When a manager sends a supplier order, the dashboard records it in `localStorage` with status `sent`,
+and the order email now includes a per-order confirm link:
+`https://bossa-sunningdale.netlify.app/confirm?id=<order-uuid>`.
+
+Flow:
+1. The supplier opens that link → a small branded page with a **Confirm receipt** button.
+2. Clicking the button POSTs to a **Netlify Function** (`netlify/functions/confirm.mjs`), which writes
+   `{status: 'confirmed', confirmed_at}` to **Netlify Blobs** (key = the order UUID).
+3. The dashboard polls `GET /api/order-status` (`netlify/functions/order-status.mjs`) on load and when
+   the Orders → History tab opens (`syncRemoteStatus()` in `generate_dashboard.py`), and
+   **auto-advances** any local order still marked `sent` to `confirmed` (showing a "Confirmed <time>"
+   line). It never overrides a manual `received`/`cancelled`.
+
+Design notes / boundaries:
+- **Two-step (GET page → POST button)** on purpose: email link-scanners issue GETs, so a GET never
+  mutates state — only a human button click confirms. Prevents false "confirmed".
+- The UUID is unguessable, so a supplier can only confirm the one order they were emailed.
+- **No new secret** — Netlify Blobs is auto-authed inside the Functions runtime.
+- Stays inside the locked order boundaries: the manager still sends every order via mailto and reviews
+  first; the manual status dropdown remains as an override. Only the supplier's own click auto-flips.
+- **Routing:** each function self-registers its clean path via `export const config = { path }`
+  (Netlify Functions v2), served same-origin — so no CORS and no `netlify.toml` redirects needed.
+- **Build impact:** adds the repo's first Node code (`package.json` → `@netlify/blobs`) but **no extra
+  daily build** and negligible function invocations (well within the free tier) — safe under the
+  build-credit constraint that caused the Jun 2026 outage.
+
+**Activation:** ships working on the next deploy — Netlify auto-detects `netlify/functions/` and
+installs `@netlify/blobs`. Nothing to configure. Until then the dashboard degrades gracefully: the
+`/api/order-status` fetch fails silently and the manual dropdown still works.
+
+**Verify locally** with `netlify dev` (needs the Netlify CLI + site linked): visit
+`http://localhost:8888/confirm?id=test-123`, click **Confirm receipt**, then load
+`http://localhost:8888/api/order-status` and confirm `test-123` shows `confirmed`.

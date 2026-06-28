@@ -1556,12 +1556,11 @@ body {
 }
 .history-date-label {
   background: var(--bg-soft);
-  padding: 9px 16px;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--ink-mute);
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--ink);
   border-bottom: 1px solid var(--line);
 }
 .history-order { border-bottom: 1px solid var(--line-soft); }
@@ -2125,7 +2124,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     updateSearchVisibility();
     applyFilter();
     if (name === 'stock-order') renderBatchPanel();
-    if (name === 'history')     renderHistory();
+    if (name === 'history')     {{ renderHistory(); syncRemoteStatus(); }}
   }}
 
   document.querySelectorAll('.tab-btn').forEach(btn => {{
@@ -2817,6 +2816,13 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       body += '\\n';
     }});
     body += replyToBodyLine();
+
+    // Confirm-receipt link — when the supplier clicks it, this order
+    // auto-flips sent→confirmed on the dashboard (see syncRemoteStatus).
+    // The id is an unguessable UUID, so it only ever confirms this order.
+    const orderId    = newOrderId();
+    const confirmUrl = location.origin + '/confirm?id=' + encodeURIComponent(orderId);
+    body += '\\nTo confirm you received this order, click: ' + confirmUrl + '\\n';
     body += '\\nThanks,\\nBossa Sunningdale';
 
     const subject = 'Bossa Sunningdale order \u2014 ' + (g.supplier || 'supplier') +
@@ -2826,7 +2832,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     // localStorage row is the source of truth; the optional Apps Script
     // webhook gets a best-effort copy.
     const order = {{
-      id:             newOrderId(),
+      id:             orderId,
       sent_at:        new Date().toISOString(),
       order_date:     dateRaw,
       supplier:       g.supplier || '',
@@ -2917,6 +2923,33 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     postToWebhook(Object.assign({{action: 'create'}}, order));
     renderHistory();
     updateHistoryBadge();
+  }}
+
+  // Pull supplier confirmations back from the Netlify Function and auto-flip
+  // matching local orders sent -> confirmed. Best-effort: if the endpoint is
+  // unreachable the dashboard keeps working with the manual dropdown intact.
+  function syncRemoteStatus() {{
+    fetch(location.origin + '/api/order-status', {{cache: 'no-store'}})
+      .then(r => r.ok ? r.json() : null)
+      .then(remote => {{
+        if (!remote) return;
+        const all = loadOrders();
+        let changed = false;
+        all.forEach(o => {{
+          const r = remote[o.id];
+          // Only advance sent -> confirmed; never clobber a manual
+          // received / cancelled the manager already set.
+          if (r && r.status === 'confirmed' && o.status === 'sent') {{
+            o.status = 'confirmed';
+            o.confirmed_at = r.confirmed_at;
+            changed = true;
+          }}
+        }});
+        if (changed) saveOrders(all);
+        renderHistory();
+        updateHistoryBadge();
+      }})
+      .catch(() => {{}});
   }}
 
   function updateOrderField(id, patch) {{
@@ -3050,6 +3083,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
             '</div>' +
             '<div class="history-meta">' + itemCount + ' item' + (itemCount === 1 ? '' : 's') +
               (sentNice ? '<span class="history-meta-sub">Sent ' + escapeHtml(sentNice) + '</span>' : '') +
+              (o.confirmed_at ? '<span class="history-meta-sub">Confirmed ' + escapeHtml(formatSentAt(o.confirmed_at)) + '</span>' : '') +
             '</div>' +
             '<select class="history-status status-' + status + '" data-id="' +
               escapeHtml(o.id) + '" onchange="onHistoryStatusChange(this)">' +
@@ -3097,6 +3131,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   updateCatAllStates();
   updateHistoryBadge();
   renderHistory();
+  syncRemoteStatus();
 </script>
 
 </body>
