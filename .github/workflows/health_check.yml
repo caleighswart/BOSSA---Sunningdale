@@ -4,10 +4,14 @@ name: Bossa Sunningdale — Daily Dashboard Health Check
 #   1. daily_bar.yml has a successful run completed today (SAST), AND
 #   2. The Netlify-served dashboard's "Updated" timestamp is today (SAST).
 #
-# Self-healing: if no daily_bar.yml run succeeded today and nothing is in
-# progress, this workflow auto-triggers daily_bar.yml via workflow_dispatch
-# (GitHub Actions occasionally drops scheduled crons under load — this
-# converts that platform glitch from a dashboard outage into a ~15 min delay).
+# Self-healing covers the two independent ways the dashboard can go stale:
+#   1. GitHub drops the scheduled daily_bar.yml cron (no successful run today) →
+#      auto-trigger daily_bar.yml via workflow_dispatch.
+#   2. daily_bar.yml ran and pushed fresh HTML, but Netlify's Git auto-deploy
+#      stalled so the live site is stale (happened 2026-06-22) → POST the
+#      Netlify build hook to force a deploy from latest main. Re-running
+#      daily_bar can't fix this — it would just push again to a Netlify that
+#      isn't deploying — so the build hook is the only real recovery here.
 # When auto-recovery fires, we open an info-level GitHub issue so there's an
 # audit trail, but exit 0 (no failure email — the system healed itself).
 #
@@ -42,9 +46,10 @@ jobs:
     steps:
       - name: Run health check
         env:
-          GH_TOKEN:          ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO:           ${{ github.repository }}
-          DASHBOARD_URL:     https://bossa-sunningdale.netlify.app/
+          GH_TOKEN:               ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO:                ${{ github.repository }}
+          DASHBOARD_URL:          https://bossa-sunningdale.netlify.app/
+          NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
         run: |
           python3 - <<'EOF'
           import json
@@ -163,11 +168,43 @@ jobs:
                   try:
                       dashboard_dt = datetime.fromisoformat(m.group(1)).astimezone(SAST)
                       if dashboard_dt.date() != today_sast:
-                          problems.append(
+                          stale_msg = (
                               f"Dashboard generated **{dashboard_dt.strftime('%d %b %Y %H:%M SAST')}** "
                               f"but today (SAST) is **{today_str}**. "
-                              f"Likely Netlify did not deploy the latest commit."
+                              f"Netlify did not deploy the latest commit."
                           )
+                          # daily_bar.yml succeeded and pushed fresh HTML today
+                          # (the cron-drop recovery above did not fire), yet the
+                          # live site is stale → Netlify's Git auto-deploy stalled
+                          # (happened 2026-06-22). Re-dispatching daily_bar wouldn't
+                          # help — it would just push again. Force a deploy via the
+                          # Netlify build hook instead; that's the only real fix for
+                          # the Netlify-side failure the cron-drop recovery is blind to.
+                          hook = os.environ.get("NETLIFY_BUILD_HOOK_URL", "")
+                          if hook:
+                              try:
+                                  hook_req = urllib.request.Request(
+                                      hook, data=b"{}", method="POST"
+                                  )
+                                  with urllib.request.urlopen(hook_req, timeout=30) as hr:
+                                      hr.read()
+                                  recoveries.append(
+                                      stale_msg + " Health check POSTed the Netlify build "
+                                      "hook to force a redeploy — the live site should "
+                                      "refresh within ~1–2 min."
+                                  )
+                              except Exception as e:
+                                  problems.append(
+                                      stale_msg + f" Auto-redeploy via the Netlify build "
+                                      f"hook also failed (`{e}`). Trigger a deploy manually "
+                                      "in the Netlify dashboard."
+                                  )
+                          else:
+                              problems.append(
+                                  stale_msg + " Set the `NETLIFY_BUILD_HOOK_URL` secret so "
+                                  "the health check can auto-redeploy; for now trigger a "
+                                  "deploy manually in the Netlify dashboard."
+                              )
                   except ValueError as e:
                       problems.append(f"Couldn't parse dashboard-generated timestamp: {e}")
 
