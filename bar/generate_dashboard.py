@@ -386,10 +386,10 @@ def _build_supplier_groups(by_cat: dict) -> list:
 
 
 def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
-    """Render the Order selection tab HTML.
+    """Render the Today's order tab HTML.
 
     Each row has a checkbox so users can hand-pick the items they want
-    to send into the Place order tab for batch ordering.
+    to send into the Review & send tab for batch ordering.
     Supplier-level and global "select all" controls are included.
     """
     if not supplier_groups:
@@ -401,7 +401,7 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
     html = (
         '<details class="email-settings" id="email-settings">'
         '  <summary class="email-settings-summary">'
-        '    <span class="email-settings-title">Order email settings</span>'
+        '    <span class="email-settings-title">Email settings</span>'
         '    <span class="email-settings-status" id="email-settings-status"></span>'
         '  </summary>'
         '  <div class="email-settings-body order-form">'
@@ -422,27 +422,30 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
         '    </div>'
         '  </div>'
         '</details>'
-        '<div class="coverage-bar">'
-        '  <div class="coverage-label">'
-        '    <span class="coverage-title">Days of coverage</span>'
-        '    <span class="coverage-help" id="coverage-help">How many days this order should last.</span>'
+        '<section class="order-console">'
+        '  <div class="order-console-intro">'
+        '    <h2 class="order-console-title">Step 1 &middot; Select today\'s order</h2>'
+        '    <p class="order-console-sub">Quantities below top each item up to its par level. Tick the items you want, choose how long the order should last, then review &amp; send.</p>'
         '  </div>'
-        '  <div class="coverage-control" role="group" aria-label="Days of coverage">'
-        '    <button type="button" class="coverage-seg active" data-days="1">1 day</button>'
-        '    <button type="button" class="coverage-seg" data-days="2">2 days</button>'
-        '    <button type="button" class="coverage-seg" data-days="3">3 days</button>'
+        '  <div class="order-console-bar">'
+        '    <div class="coverage-inline">'
+        '      <span class="coverage-title">Order to last</span>'
+        '      <div class="coverage-control" role="group" aria-label="Days of coverage">'
+        '        <button type="button" class="coverage-seg active" data-days="1">1 day</button>'
+        '        <button type="button" class="coverage-seg" data-days="2">2 days</button>'
+        '        <button type="button" class="coverage-seg" data-days="3">3 days</button>'
+        '      </div>'
+        '      <span class="coverage-help" id="coverage-help">How many days this order should last.</span>'
+        '    </div>'
+        '    <div class="order-console-actions">'
+        '      <label class="check-row check-row-strong">'
+        '        <input type="checkbox" id="select-all-reorder">'
+        '        <span>Select all items</span>'
+        '      </label>'
+        '      <button type="button" class="order-btn" onclick="sendSelectionToStockOrder()">Review &amp; send selected</button>'
+        '    </div>'
         '  </div>'
-        '</div>'
-        '<div class="selection-toolbar">'
-        '  <label class="check-row check-row-strong">'
-        '    <input type="checkbox" id="select-all-reorder">'
-        '    <span>Select all reorder items</span>'
-        '  </label>'
-        '  <button type="button" class="order-btn order-btn-secondary" '
-        '          onclick="sendSelectionToStockOrder()">'
-        '    Send selected to Place order'
-        '  </button>'
-        '</div>'
+        '</section>'
     )
 
     for gi, g in enumerate(supplier_groups):
@@ -599,12 +602,11 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
     return html
 
 
-def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
-    """Render the Place order tab.
+def _adhoc_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
+    """Render the Ad-hoc order tab — a single-product one-off order form.
 
-    Two entry paths:
-      1. Ad-hoc: a single-product form for one-off orders (primary, top of tab).
-      2. Batch: items selected on the Order selection tab arrive here for review.
+    Lives in its own tab (reached from the Orders sidebar dropdown) so it's
+    visually separate from the batch review (_stock_order_tab).
 
     Catalogue is the union of every par-sheet product (pars.json) and every
     product PilotLive returned today — so Sava can order anything in the bar
@@ -632,8 +634,8 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
 
     return f"""
 <div class="order-form-card">
-  <h3 class="section-title">Place an ad-hoc order</h3>
-  <p class="form-help">Order any product in the bar catalogue — opens your email client ready to send. Start typing the product name to search.</p>
+  <h3 class="section-title">Ad-hoc order <span class="badge badge-info">one-off</span></h3>
+  <p class="form-help">A one-off order for a single product &mdash; completely separate from today's restock. Use this for specials, replacements, or anything not flagged critical or low. Start typing the product name to search.</p>
 
   <form id="stock-order-form" class="order-form" onsubmit="submitStockOrder(event)">
     <div class="form-row">
@@ -657,7 +659,7 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
     <div class="form-row">
       <label for="order-email">Supplier email</label>
       <input type="email" id="order-email" name="email" value="hello@makematicai.com" data-email-default="hello@makematicai.com" placeholder="supplier@example.com" required>
-      <span class="form-hint">Defaults to the address set in <strong>Order email settings</strong> (Order selection tab). The confirmation will open in your email client ready to send.</span>
+      <span class="form-hint">Defaults to the address set in <strong>Order email settings</strong> (Today's order tab). The confirmation will open in your email client ready to send.</span>
     </div>
 
     <div class="form-actions">
@@ -679,15 +681,26 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
     </div>
   </div>
 </div>
+"""
 
+
+def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
+    """Render the Review & send tab — batch review only.
+
+    Items selected on the Today's order tab arrive here for review and
+    sending, grouped by supplier. The ad-hoc single-product form lives in its
+    own tab (see _adhoc_order_tab). Signature kept stable for the call site;
+    all_rows / pars are unused here now.
+    """
+    return f"""
 <div class="order-form-card batch-order-card">
-  <h3 class="section-title">Review &amp; send selected reorder items</h3>
-  <p class="form-help">Items you ticked on the <strong>Order selection</strong> tab show up here. Adjust quantities if needed, then send the batch by email grouped by supplier.</p>
+  <h3 class="section-title">Step 2 &middot; Review &amp; send today's order</h3>
+  <p class="form-help">These are the critical and low items you ticked on <strong>Today's order</strong>, grouped by supplier. Check the quantities, then send each supplier's order by email. This is your daily restock &mdash; for a one-off item use the <strong>Ad-hoc order</strong> tab instead.</p>
 
   <div id="batch-empty" class="batch-empty">
-    <p>No items selected yet. Open the <strong>Order selection</strong> tab, tick the products you want to order, then come back here.</p>
+    <p>No items selected yet. Open the <strong>Today's order</strong> tab, tick the products you want to order, then come back here.</p>
     <div class="form-actions">
-      <button type="button" class="order-btn order-btn-secondary" onclick="goToTab('orders')">Go to Order selection</button>
+      <button type="button" class="order-btn order-btn-secondary" onclick="goToTab('orders')">Go to Today's order</button>
     </div>
   </div>
 
@@ -697,7 +710,7 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
       <input type="date" id="batch-order-date" name="batch-date" value="{today_iso}" required>
     </div>
     <div class="form-actions batch-toolbar">
-      <button type="button" class="order-btn" onclick="useSelectedReorderItems()">Use selected reorder items</button>
+      <button type="button" class="order-btn" onclick="useSelectedReorderItems()">Refresh from Today's order</button>
       <button type="button" class="order-btn order-btn-secondary" onclick="clearBatchSelection()">Clear selection</button>
     </div>
     <div id="batch-groups"></div>
@@ -861,6 +874,26 @@ body {
   line-height: 1.6;
 }
 .side-foot b { color: #94A3B8; font-weight: 600; display: block; }
+.side-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 4px 10px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(148,163,184,0.18);
+}
+.side-sub-link {
+  display: block;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #94A3B8;
+  transition: background 0.12s, color 0.12s;
+}
+.side-sub-link:hover { color: #E2E8F0; background: rgba(148,163,184,0.08); }
+.side-sub-link.active { background: var(--side-hi); color: #FFFFFF; font-weight: 600; }
 
 /* === Topbar ============================================= */
 .topbar {
@@ -1323,6 +1356,50 @@ body {
 .coverage-seg + .coverage-seg { border-left: 1px solid var(--line-strong); }
 .coverage-seg:hover { color: var(--ink); background: var(--bg-soft); }
 .coverage-seg.active { color: #FFFFFF; background: var(--action); font-weight: 600; }
+
+/* === Order console (Orders › review & send header) ===== */
+.order-console {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  padding: 20px 22px;
+  margin-bottom: 16px;
+}
+.order-console-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.order-console-sub {
+  font-size: 13.5px;
+  color: var(--ink-mute);
+  margin-top: 5px;
+  max-width: 64ch;
+  line-height: 1.5;
+}
+.order-console-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px 28px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.coverage-inline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.coverage-inline .coverage-title { font-size: 13px; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.coverage-inline .coverage-help { font-size: 12.5px; color: var(--ink-mute); }
+.order-console-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.order-console-actions .check-row { white-space: nowrap; }
+
+/* Quieter email-settings strip at top of Orders tab */
+#tab-orders > .email-settings { margin-bottom: 12px; background: var(--bg-soft); }
+#tab-orders > .email-settings:not([open]) { background: transparent; border-color: var(--line); }
+#tab-orders > .email-settings > .email-settings-summary { padding: 10px 16px 10px 34px; font-size: 13px; color: var(--ink-soft); }
+#tab-orders > .email-settings > .email-settings-summary::before { left: 15px; }
+#tab-orders > .email-settings[open] > .email-settings-summary { color: var(--ink); }
 
 /* === Forms ============================================== */
 .order-form-card {
@@ -1851,6 +1928,7 @@ code {
   .side-brand span { display: none; }
   .side-nav { margin-top: 0; flex-direction: row; gap: 4px; flex: 1; }
   .prim { padding: 8px 12px; font-size: 13.5px; }
+  .side-sub { display: none; }
   .side-count { display: none; }
   .side-count-hot { display: inline-block; }
   .side-foot { display: none; }
@@ -1961,8 +2039,10 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     orders_tab  = _orders_tab(supplier_groups, day_str, brief_date)
     total_order = sum(len(g["critical"]) + len(g["low"]) for g in supplier_groups)
 
-    # ── Stock Order tab ───────────────────────────────────────────────────────
-    stock_order_tab = _stock_order_tab(all_rows, load_pars(), brief_date)
+    # ── Order tabs (ad-hoc form + batch review) ───────────────────────────────
+    _order_pars = load_pars()
+    adhoc_tab       = _adhoc_order_tab(all_rows, _order_pars, brief_date)
+    stock_order_tab = _stock_order_tab(all_rows, _order_pars, brief_date)
 
     # ── Front / back counts (shown as columns inside the stock tabs) ───────────
     front_back = load_front_back()
@@ -2004,6 +2084,12 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   <nav class="side-nav">
     <button type="button" class="prim active" data-section="stock">Stock<span class="side-count">{tracked_count}</span></button>
     <button type="button" class="prim" data-section="orders">Orders<span class="side-count side-count-hot">{total_order}</span></button>
+    <div class="side-sub" data-section="orders" hidden>
+      <button type="button" class="tab-btn side-sub-link" data-tab="orders">Today&#x27;s order</button>
+      <button type="button" class="tab-btn side-sub-link" data-tab="stock-order">Review &amp; send</button>
+      <button type="button" class="tab-btn side-sub-link" data-tab="adhoc">Ad-hoc order</button>
+      <button type="button" class="tab-btn side-sub-link" data-tab="history">History</button>
+    </div>
     <button type="button" class="prim" data-section="admin">Admin<span class="side-count">{len(missing_par)}</span></button>
   </nav>
   <div class="side-foot"><b>PilotLive sync</b>{day_str}<br>Updated {time_str}</div>
@@ -2034,8 +2120,9 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     <button class="tab-btn chip" data-tab="variance">Variances <span class="count c-var">{total_var}</span></button>
   </div>
   <div class="chip-group" data-section="orders" hidden>
-    <button class="tab-btn chip" data-tab="orders">By supplier <span class="count c-order">{total_order}</span></button>
-    <button class="tab-btn chip" data-tab="stock-order">Place order <span class="count c-batch" id="batch-count-badge" hidden>0</span></button>
+    <button class="tab-btn chip" data-tab="orders">Today&#x27;s order <span class="count c-order">{total_order}</span></button>
+    <button class="tab-btn chip" data-tab="stock-order">Review &amp; send <span class="count c-batch" id="batch-count-badge" hidden>0</span></button>
+    <button class="tab-btn chip" data-tab="adhoc">Ad-hoc order</button>
     <button class="tab-btn chip" data-tab="history">History <span class="count c-hist" id="history-count-badge" hidden>0</span></button>
   </div>
   <div class="chip-group" data-section="admin" hidden>
@@ -2053,13 +2140,14 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   <div class="tab-pane" id="tab-low">{low_tab}</div>
   <div class="tab-pane" id="tab-healthy">{healthy_tab}</div>
   <div class="tab-pane" id="tab-orders">{orders_tab}</div>
+  <div class="tab-pane" id="tab-adhoc">{adhoc_tab}</div>
   <div class="tab-pane" id="tab-stock-order">{stock_order_tab}</div>
   <div class="tab-pane" id="tab-history">
     <div class="history-intro">
       <h3 class="section-title">Order history</h3>
       <p class="admin-note">Orders sent by email are saved in this browser. Update each order's status as it moves through the supplier (sent → confirmed → received).</p>
     </div>
-    <p class="empty" id="history-empty">No orders sent yet. When you send an order from the <strong>Place order</strong> tab, it'll appear here.</p>
+    <p class="empty" id="history-empty">No orders sent yet. When you send an order, it'll appear here.</p>
     <div id="history-list"></div>
     <div class="history-footer" id="history-footer" hidden>
       <button type="button" class="order-btn order-btn-secondary" onclick="clearOrderHistory()">Clear local history</button>
@@ -2097,6 +2185,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     all:         'stock',
     variance:    'stock',
     orders:      'orders',
+    adhoc:       'orders',
     'stock-order': 'orders',
     history:     'orders',
     admin:       'admin',
@@ -2110,14 +2199,17 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       if (g.dataset.section === section) g.removeAttribute('hidden');
       else                                g.setAttribute('hidden', '');
     }});
+    document.querySelectorAll('.side-sub').forEach(s => {{
+      if (s.dataset.section === section) s.removeAttribute('hidden');
+      else                                s.setAttribute('hidden', '');
+    }});
   }}
 
   function goToTab(name) {{
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-    const btn  = document.querySelector('.tab-btn[data-tab="' + name + '"]');
+    document.querySelectorAll('.tab-btn[data-tab="' + name + '"]').forEach(b => b.classList.add('active'));
     const pane = document.getElementById('tab-' + name);
-    if (btn)  btn.classList.add('active');
     if (pane) pane.classList.add('active');
     const section = TAB_SECTION[name];
     if (section) setActiveSection(section);
@@ -2372,7 +2464,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     document.getElementById('order-confirmation').hidden = true;
   }}
 
-  // \u2500\u2500 Order selection: checkbox state \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  // \u2500\u2500 Today's order: checkbox state \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   function reorderChecks() {{
     return Array.from(document.querySelectorAll('.reorder-check'));
   }}
@@ -2517,10 +2609,9 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   function sendSelectionToStockOrder() {{
     const picked = selectedReorder();
     if (picked.length === 0) {{
-      alert('Tick at least one item to send to the Place order tab.');
+      alert('Tick at least one item on Today\\'s order first, then press Review & send.');
       return;
     }}
-    prefillAdhocFromSelection(picked[0]);
     goToTab('stock-order');
   }}
 
@@ -2660,7 +2751,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       totalItems += g.items.length;
       const sendBtn = g.email
         ? '<button type="button" class="order-btn batch-send-btn" data-gi="' + gi + '" onclick="sendBatchGroup(this)">Send batch via email</button>'
-        : '<p class="batch-no-wa">Add an email for this supplier in <strong>Order email settings</strong> on the Order selection tab.</p>';
+        : '<p class="batch-no-wa">Add an email for this supplier in <strong>Order email settings</strong> on the Today\\'s order tab.</p>';
       html += '' +
         '<div class="batch-group" data-gi="' + gi + '">' +
           '<div class="batch-group-header">' +
@@ -2736,7 +2827,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     const sendable = [];
     allGroups.forEach((g, gi) => {{ if (g.email) sendable.push(gi); }});
     if (sendable.length === 0) {{
-      alert('No supplier email set — open Order email settings on the Order selection tab and add the supplier address.');
+      alert('No supplier email set — open Order email settings on the Today\\'s order tab and add the supplier address.');
       return;
     }}
     sendable.forEach((gi, idx) => {{
