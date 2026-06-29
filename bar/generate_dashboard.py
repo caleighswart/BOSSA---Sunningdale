@@ -423,19 +423,24 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
         '  </div>'
         '</details>'
         '<section class="order-console">'
+        '  <ol class="order-stepper" id="order-stepper-1" aria-label="Order progress">'
+        '    <li class="step" data-step="select"><span class="step-dot">1</span><span class="step-label">Select</span></li>'
+        '    <li class="step" data-step="review"><span class="step-dot">2</span><span class="step-label">Review</span></li>'
+        '    <li class="step" data-step="send"><span class="step-dot">3</span><span class="step-label">Send</span></li>'
+        '  </ol>'
         '  <div class="order-console-intro">'
-        '    <h2 class="order-console-title">Step 1 &middot; Select today\'s order</h2>'
+        '    <h2 class="order-console-title">Select today\'s order</h2>'
         '    <p class="order-console-sub">Quantities below top each item up to its par level. Tick the items you want, choose how long the order should last, then review &amp; send.</p>'
         '  </div>'
         '  <div class="order-console-bar">'
         '    <div class="coverage-inline">'
-        '      <span class="coverage-title">Order to last</span>'
+        '      <span class="coverage-title">Days this order must cover</span>'
         '      <div class="coverage-control" role="group" aria-label="Days of coverage">'
         '        <button type="button" class="coverage-seg active" data-days="1">1 day</button>'
         '        <button type="button" class="coverage-seg" data-days="2">2 days</button>'
         '        <button type="button" class="coverage-seg" data-days="3">3 days</button>'
         '      </div>'
-        '      <span class="coverage-help" id="coverage-help">How many days this order should last.</span>'
+        '      <span class="coverage-help" id="coverage-help">Tops each item up to par — use when the next delivery is tomorrow.</span>'
         '    </div>'
         '    <div class="order-console-actions">'
         '      <label class="check-row check-row-strong">'
@@ -694,7 +699,12 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
     """
     return f"""
 <div class="order-form-card batch-order-card">
-  <h3 class="section-title">Step 2 &middot; Review &amp; send today's order</h3>
+  <ol class="order-stepper" id="order-stepper-2" aria-label="Order progress">
+    <li class="step" data-step="select"><span class="step-dot">1</span><span class="step-label">Select</span></li>
+    <li class="step" data-step="review"><span class="step-dot">2</span><span class="step-label">Review</span></li>
+    <li class="step" data-step="send"><span class="step-dot">3</span><span class="step-label">Send</span></li>
+  </ol>
+  <h3 class="section-title">Review &amp; send today's order</h3>
   <p class="form-help">These are the critical and low items you ticked on <strong>Today's order</strong>, grouped by supplier. Check the quantities, then send each supplier's order by email. This is your daily restock &mdash; for a one-off item use the <strong>Ad-hoc order</strong> tab instead.</p>
 
   <div id="batch-empty" class="batch-empty">
@@ -710,7 +720,6 @@ def _stock_order_tab(all_rows: list, pars: dict, today_iso: str) -> str:
       <input type="date" id="batch-order-date" name="batch-date" value="{today_iso}" required>
     </div>
     <div class="form-actions batch-toolbar">
-      <button type="button" class="order-btn" onclick="useSelectedReorderItems()">Refresh from Today's order</button>
       <button type="button" class="order-btn order-btn-secondary" onclick="clearBatchSelection()">Clear selection</button>
     </div>
     <div id="batch-groups"></div>
@@ -1393,6 +1402,71 @@ body {
 .coverage-inline .coverage-help { font-size: 12.5px; color: var(--ink-mute); }
 .order-console-actions { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .order-console-actions .check-row { white-space: nowrap; }
+
+/* === Order progress stepper (Select · Review · Send) === */
+.order-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+}
+.order-stepper .step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+.order-stepper .step:not(:last-child)::after {
+  content: "";
+  width: 28px;
+  height: 2px;
+  margin: 0 14px;
+  background: var(--line-strong);
+  border-radius: 2px;
+}
+.order-stepper .step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line-strong);
+  background: var(--panel);
+  color: var(--ink-mute);
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.order-stepper .step.active { color: var(--ink); }
+.order-stepper .step.active .step-dot {
+  border-color: var(--action);
+  background: var(--accent-bg);
+  color: var(--action);
+}
+.order-stepper .step.complete { color: var(--ok); }
+.order-stepper .step.complete .step-dot {
+  border-color: var(--ok-line);
+  background: var(--ok-bg);
+  color: var(--ok);
+  font-size: 0;
+}
+.order-stepper .step.complete .step-dot::before {
+  content: "\2713";
+  font-size: 13px;
+  line-height: 1;
+}
+.order-stepper .step.complete:not(:last-child)::after { background: var(--ok-line); }
+@media (max-width: 640px) {
+  .order-stepper .step .step-label { display: none; }
+  .order-stepper .step:not(:last-child)::after { width: 18px; margin: 0 8px; }
+}
 
 /* Quieter email-settings strip at top of Orders tab */
 #tab-orders > .email-settings { margin-bottom: 12px; background: var(--bg-soft); }
@@ -2217,6 +2291,32 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     applyFilter();
     if (name === 'stock-order') renderBatchPanel();
     if (name === 'history')     {{ renderHistory(); syncRemoteStatus(); }}
+    paintSteppers();
+  }}
+
+  // Order progress stepper (Select -> Review -> Send). One instance per order
+  // tab; this repaints all instances from current tab + selection + sent state.
+  let orderSentThisSession = false;
+  function paintSteppers() {{
+    const activePane = document.querySelector('.tab-pane.active');
+    const tab = activePane ? activePane.id : '';
+    const hasSelection = (typeof selectedReorder === 'function') && selectedReorder().length > 0;
+    const sent = orderSentThisSession;
+
+    let select = '', review = '', send = '';
+    if (hasSelection || sent) select = 'complete';
+    if (tab === 'tab-orders') select = 'active';
+    if (sent) review = 'complete';
+    else if (tab === 'tab-stock-order') review = 'active';
+    if (sent) send = 'complete';
+    else if (tab === 'tab-stock-order' && hasSelection) send = 'active';
+
+    const map = {{ select: select, review: review, send: send }};
+    document.querySelectorAll('.order-stepper .step').forEach(li => {{
+      li.classList.remove('active', 'complete');
+      const s = map[li.dataset.step];
+      if (s) li.classList.add(s);
+    }});
   }}
 
   document.querySelectorAll('.tab-btn').forEach(btn => {{
@@ -2521,6 +2621,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     updateSupplierAllStates();
     updateCatAllStates();
     updateBatchBadge();
+    paintSteppers();
   }}
 
   document.querySelectorAll('.reorder-check').forEach(cb => {{
@@ -2562,9 +2663,9 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   // because United doesn't deliver on Sunday, so Saturday's order must carry
   // through to Monday's delivery.
   const COVERAGE_HELP = {{
-    1: 'Topping up to par — one delivery cycle.',
-    2: 'Covering two days — e.g. Saturday through Sunday (no United delivery).',
-    3: 'Covering three days — heavier hold, fewer orders.'
+    1: 'Tops each item up to par — use when the next delivery is tomorrow.',
+    2: 'Covers a day with no delivery — e.g. a Saturday order carries through Sunday (no United delivery) to Monday.',
+    3: 'Covers a longer gap with no delivery, e.g. a long weekend. Heavier hold, fewer orders.'
   }};
 
   function neededFor(par, soh, kegL, days) {{
@@ -2596,6 +2697,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     if (help) help.textContent = COVERAGE_HELP[days] || COVERAGE_HELP[1];
     // Keep the batch panel in sync if it's already populated/visible.
     try {{ renderBatchPanel(); }} catch (e) {{}}
+    paintSteppers();
   }}
 
   (function initCoverage() {{
@@ -2842,9 +2944,6 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     }});
   }}
 
-  function useSelectedReorderItems() {{
-    renderBatchPanel();
-  }}
 
   function clearBatchSelection() {{
     reorderChecks().forEach(cb => {{ cb.checked = false; }});
@@ -2908,12 +3007,11 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     }});
     body += replyToBodyLine();
 
-    // Confirm-receipt link — when the supplier clicks it, this order
-    // auto-flips sent→confirmed on the dashboard (see syncRemoteStatus).
-    // The id is an unguessable UUID, so it only ever confirms this order.
-    const orderId    = newOrderId();
-    const confirmUrl = location.origin + '/confirm?id=' + encodeURIComponent(orderId);
-    body += '\\nTo confirm you received this order, click: ' + confirmUrl + '\\n';
+    // Order id stays the local source-of-truth key for the saved order below.
+    // (The supplier confirm-receipt link was removed pending go-live with the
+    // real BOSSA + supplier email addresses; syncRemoteStatus stays inert but
+    // harmless until then.)
+    const orderId = newOrderId();
     body += '\\nThanks,\\nBossa Sunningdale';
 
     const subject = 'Bossa Sunningdale order \u2014 ' + (g.supplier || 'supplier') +
@@ -3012,6 +3110,8 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     all.push(order);
     saveOrders(all);
     postToWebhook(Object.assign({{action: 'create'}}, order));
+    orderSentThisSession = true;
+    paintSteppers();
     renderHistory();
     updateHistoryBadge();
   }}
