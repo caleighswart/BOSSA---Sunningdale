@@ -63,7 +63,8 @@ into `bar/front_back.json` with an `_as_of` date. See "Front & Back stock" below
 | PilotLive password | GitHub Secret | `PILOTLIVE_PASSWORD` |
 | Orders webhook URL | GitHub Secret | `BOSSA_ORDERS_WEBHOOK` (receives a best-effort copy of sent orders for the dashboard's order-history sync to a Google Sheet) |
 | Netlify build hook | GitHub Secret | `NETLIFY_BUILD_HOOK_URL` (Netlify → Site settings → Build & deploy → Build hooks, branch `main`). POSTed by `health_check.yml` only, on a stale-live recovery, to force a deploy independent of Netlify's Git webhook. **Not yet created** — until the hook exists and this secret is set, the health-check self-heal is inert (a stale event still alerts, just can't auto-redeploy). Optional — degrades to Git auto-deploy if unset. (`daily_bar.yml`'s per-push hook is deliberately **not** shipped — it would double build-credit burn.) |
-| Netlify API token | GitHub Secret | `NETLIFY_API_TOKEN` (Netlify → User settings → Applications → Personal access tokens → New access token). Read-only use: `health_check.yml` polls account build-minute usage to warn before the monthly quota is exhausted. **Not yet created** — the usage monitor is skipped silently until it's set. Optional `NETLIFY_ACCOUNT_ID` overrides the auto-discovered account (first account the token can see). |
+| Netlify API token | GitHub Secret | `NETLIFY_API_TOKEN` (Netlify → User settings → Applications → Personal access tokens → New access token). Two uses: (1) `health_check.yml` polls account build-minute usage to warn before the monthly quota is exhausted (read-only); (2) `daily_bar.yml`'s par-merge step reads **and deletes** the `par-overrides` Netlify Blobs store (needs `NETLIFY_SITE_ID` too). **Not yet created** — both the usage monitor and the par-merge are skipped silently until it's set. Optional `NETLIFY_ACCOUNT_ID` overrides the auto-discovered account (first account the token can see). |
+| Netlify site ID | GitHub Secret | `NETLIFY_SITE_ID` (Netlify → Site settings → General → Site information → Site ID / API ID). Used **only** by `daily_bar.yml`'s par-merge step (`bar/merge_par_overrides.mjs`) to address the `par-overrides` Blobs store from CI — the SDK needs an explicit `siteID` + `token` outside the Functions runtime. **Not yet created** — par-merge no-ops until both this and `NETLIFY_API_TOKEN` are set (saving still works; saved pars just stay inert). See "Admin par editing". |
 | ~~Telegram tokens~~ | ~~GitHub Secret~~ | Unused since 2026-05-13 — safe to delete from repo Settings |
 
 **GitHub Secrets location:** repo → Settings → Secrets and variables → Actions
@@ -96,9 +97,12 @@ inventory/               — DORMANT: workflow disabled, code untouched
 prep/                    — DORMANT: workflow disabled, code untouched
   main.py, pilotfetch.py, prep_engine.py, prep_config.py, requirements.txt
 
-netlify/functions/       — Serverless endpoints for the order confirm-receipt flow
+netlify/functions/       — Serverless endpoints (order confirm-receipt + par editing)
   confirm.mjs            — Supplier "confirm receipt" page (GET) + recorder (POST → Netlify Blobs)
   order-status.mjs       — JSON read-back of confirmations for the dashboard (GET /api/order-status)
+  set-par.mjs            — Manager fills a missing par (POST /api/set-par → Netlify Blobs)
+  par-overrides.mjs      — JSON read-back of saved pars for the dashboard (GET /api/par-overrides)
+bar/merge_par_overrides.mjs — Build-time merge of saved pars into pars.json (+ --clear mode)
 netlify.toml            — Netlify config (publish=docs; functions dir)
 package.json            — @netlify/blobs dependency for the functions (repo's only Node code)
 
@@ -164,12 +168,13 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-06-28 | Finished the build-hook self-heal *properly* — the deferred half of the 2026-06-27 structural follow-up. | Shipped **only** the `health_check.yml` staleness-only path (commit `4f7cedf`): on a stale-live event it POSTs `NETLIFY_BUILD_HOOK_URL`, auto-recovers (info issue, no email), and falls back to a hard-fail alert if the POST errors. Fires rarely (only on detected staleness) so it adds **no** per-day credit burn. `daily_bar.yml`'s per-push hook stays **unshipped by design** (it would double credit burn). **Still pending (manual, owner-only):** create the build hook in the Netlify UI and set the `NETLIFY_BUILD_HOOK_URL` secret — until then the self-heal is inert and degrades gracefully (a stale event hard-fails with a "set the secret" message, same alert behaviour as before). ⚠️ Scope: this guards a genuine *Git-webhook stall* (the 2026-06-22 theory) — it does **not** help against Netlify **build-credit exhaustion** (the actual cause of the Jun outage), which only a usage/quota fix prevents. |
 | 2026-06-28 | Addressed the *actual* Jun-outage failure mode: Netlify build-credit exhaustion had no early warning — it only surfaced as a 6-day live-site freeze. | Added a **build-credit monitor** to `health_check.yml` (commit `a1da67a`): polls the Netlify account's build-minute usage each run and warns *before* the quota runs out — ≥80% used → info issue (no email), ≥95% → hard failure (email). Account auto-discovered from the token (override via `NETLIFY_ACCOUNT_ID`). Optional + graceful: needs a Netlify PAT in `NETLIFY_API_TOKEN`; skipped silently if unset, and any monitoring-API error is logged but never fails the health check. **Still pending (manual, owner-only):** create the Netlify PAT and set `NETLIFY_API_TOKEN` to activate. Unlike the build-hook self-heal, this targets the failure mode that actually took the site down. |
 | 2026-06-28 | **Feature (manager request):** Orders → History showed status only via a manual dropdown the manager set by hand, and the date group headers were small/muted (11px, all-caps, grey). | (a) Restyled the History date headers — sentence-case, 14px/700, dark ink (on-brand vs. the old muted all-caps; uppercase reserved for ≤11px labels per the v3 design system). (b) Added a **confirm-receipt link** to every order email (`/confirm?id=<order-uuid>`). When the *supplier* clicks it and presses "Confirm receipt", a **Netlify Function** (`netlify/functions/confirm.mjs`) records it to **Netlify Blobs**; the dashboard polls `/api/order-status` (`order-status.mjs`) on load + History-tab open and auto-advances that order `sent → confirmed` (shows a "Confirmed <time>" line). **Two-step GET-page→POST** so email link-scanners can't auto-confirm. Keeps the manual mailto send + the dropdown as an override; stays inside the locked order boundaries (manager still sends/reviews; only the supplier's own click flips status). **No new secret** (Blobs is auto-authed in the Functions runtime). Adds the repo's first Node code (`package.json` → `@netlify/blobs`, `netlify/functions/`) but **no extra daily build** and negligible invocations — safe under the build-credit constraint. See "Order Confirm-Receipt" section below. |
+| 2026-06-30 | **Feature (manager request):** the Admin tab's "Missing par levels" list was read-only — the only way to set a par was to hand-edit `bar/pars.json` and commit, so the long-standing "fill in missing pars" TODO never moved. | Made each missing-par row **editable from the dashboard** (PR #27). The manager types a par + Save → a **Netlify Function** (`set-par.mjs`, `POST /api/set-par`) writes it to **Netlify Blobs** (store `par-overrides`); `par-overrides.mjs` (`GET /api/par-overrides`) reads saved values back so the inputs persist across reloads. The entered par becomes the **real** par: a new build-time Node step (`bar/merge_par_overrides.mjs`, run in `daily_bar.yml` **before** `generate_dashboard.py`) merges overrides into `pars.json` (only keys already on the sheet — junk-safe), so on the next refresh the product leaves the missing list and drives classification/orders/KPIs. `daily_bar.yml` also commits `pars.json` and clears consumed overrides **only after a successful push** (a mid-run failure never drops an edit — it re-applies next run). Stays inside the locked order boundaries (pars ≠ the display-only prep sheet; orders still manager-reviewed, so an errant par is caught at the order gate). **Latency:** a saved par applies on the next dashboard build, not instantly — UI says "applies on next refresh". **Still pending (manual, owner-only):** set `NETLIFY_API_TOKEN` (already pending for the build-credit monitor) **+ `NETLIFY_SITE_ID`** — until both exist the merge no-ops, so saving works but pars stay inert (CI warns, never fails). The merge step never fails the daily build. See "Admin par editing" section below. |
 
 ---
 
 ## TODO (pending confirmation from Sava)
 
-- Fill in missing par levels for the items flagged in the dashboard's "PAR MISSING" admin tab (mix cocktails, Slo Jo syrups, glenfiddich/bushmills range, vapes, etc.)
+- Fill in missing par levels for the items flagged in the dashboard's "PAR MISSING" admin tab (mix cocktails, Slo Jo syrups, glenfiddich/bushmills range, vapes, etc.). **As of 2026-06-30 this is self-service from the dashboard** — managers type the par into the editable field on the Admin tab and it writes back to `pars.json` on the next build (see "Admin par editing" section below). **Still needs the `NETLIFY_API_TOKEN` + `NETLIFY_SITE_ID` secrets set** before saved pars actually take effect; until then the field saves but the value stays inert.
 
 ---
 
@@ -263,3 +268,56 @@ installs `@netlify/blobs`. Nothing to configure. Until then the dashboard degrad
 **Verify locally** with `netlify dev` (needs the Netlify CLI + site linked): visit
 `http://localhost:8888/confirm?id=test-123`, click **Confirm receipt**, then load
 `http://localhost:8888/api/order-status` and confirm `test-123` shows `confirmed`.
+
+---
+
+## Admin par editing (fill missing pars from the dashboard)
+
+Shipped 2026-06-30 (PR #27). The Admin tab's "Missing par levels" list is editable: each row has
+a par input + **Save**. A saved par becomes the **real** par — it writes back to `bar/pars.json`
+and drives classification, orders and KPIs on the next refresh. This is the self-service path for
+the long-standing "fill in missing pars" TODO.
+
+Flow:
+1. Manager types a par into the row and clicks **Save** → `savePar()` POSTs `{product, par}` to
+   `set-par.mjs` (`POST /api/set-par`), which writes `{par}` to **Netlify Blobs** (store
+   `par-overrides`, key = the raw `pars.json` product name). Empty input → `par: null` (clears it).
+2. On load + Admin-tab open, `fetchParOverrides()` reads `par-overrides.mjs` (`GET
+   /api/par-overrides`) and reflects saved values back into the inputs ("Saved — applies on next
+   refresh"), so an entry persists across reloads even before the next build.
+3. The next `daily_bar.yml` run executes `bar/merge_par_overrides.mjs` **before**
+   `generate_dashboard.py`: it reads the overrides and writes each into `pars.json` — **only for
+   keys already on the sheet** (unknown/crafted keys are ignored). The generator then reads the
+   merged `pars.json` via `load_pars()`, so the product leaves "Missing par levels" and classifies
+   normally. `pars.json` is committed alongside `docs/index.html`.
+4. **After** a successful commit/push, a final step runs `merge_par_overrides.mjs --clear`, deleting
+   only the overrides whose value is now reflected in `pars.json`.
+
+Design notes / boundaries:
+- **Server-authoritative, not localStorage** — the entered value is the real par (the manager owns
+  their stock pars), so it must reach the source of truth, not sit as a per-browser note.
+- **Stays inside the locked order boundaries** — `pars.json` is the managers' own count-sheet data
+  (≠ the display-only front/back prep sheet), and orders are still manager-reviewed before sending,
+  so an errant par is caught at the order-review gate, never auto-sent.
+- **Mid-run safety (the one ordering subtlety):** the clear step has **no `if: always()`** — it only
+  runs when merge + generate + commit/push all succeeded. If an earlier step fails (e.g. SSRS down),
+  the merge's on-disk `pars.json` edit is discarded uncommitted **and** the override is *not* cleared,
+  so it simply re-applies next run. Never lose an edit.
+- **Never fails the daily build** — `merge_par_overrides.mjs` swallows its own errors and exits 0;
+  the critical dashboard refresh is unaffected if Blobs is unreachable.
+- `@netlify/blobs` is **Node-only**, so the merge is a Node step (not Python). Addressing Blobs from
+  CI (outside the Functions runtime) needs an explicit `siteID` + `token` — hence `NETLIFY_SITE_ID`
+  + `NETLIFY_API_TOKEN`.
+- **Latency:** a saved par takes full effect on the next build (~05:13 / 07:17 SAST, or a manual
+  `workflow_dispatch`) — surfaced honestly in the UI as "applies on next refresh".
+
+**Activation (pending, owner-only):** set the `NETLIFY_API_TOKEN` + `NETLIFY_SITE_ID` GitHub
+Secrets. Until both exist the merge no-ops and the daily build logs a `::warning::` listing pending
+pars — saving still works (Blobs is auto-authed in the Functions runtime), but the value stays inert
+until the merge can run. The functions themselves deploy automatically on the next Netlify build.
+
+**Verify locally** with `netlify dev`: open Admin → Missing par levels, type a par, **Save** → state
+shows "Saved"; reload → value persists (via `/api/par-overrides`); `GET /api/par-overrides` shows
+`{ "<product>": <par> }`. Then with `NETLIFY_SITE_ID`/`NETLIFY_API_TOKEN` exported, run
+`node bar/merge_par_overrides.mjs` and confirm `pars.json` gained the par (key order + other nulls
+preserved).
