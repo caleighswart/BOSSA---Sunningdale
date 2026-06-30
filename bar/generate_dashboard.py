@@ -865,6 +865,17 @@ body {
 }
 .prim:hover { color: #E2E8F0; background: rgba(148,163,184,0.08); }
 .prim.active { background: var(--side-hi); color: #FFFFFF; font-weight: 600; }
+.prim-group .prim-name { margin-right: auto; }
+.prim-chev {
+  flex: none;
+  width: 0; height: 0;
+  border-left: 5px solid currentColor;
+  border-top: 4.5px solid transparent;
+  border-bottom: 4.5px solid transparent;
+  opacity: 0.55;
+  transition: transform 0.15s ease;
+}
+.prim-group.expanded .prim-chev { transform: rotate(90deg); }
 .side-count {
   font-size: 11px;
   font-weight: 600;
@@ -2003,6 +2014,7 @@ code {
   .side-nav { margin-top: 0; flex-direction: row; gap: 4px; flex: 1; }
   .prim { padding: 8px 12px; font-size: 13.5px; }
   .side-sub { display: none; }
+  .prim-chev { display: none; }
   .side-count { display: none; }
   .side-count-hot { display: inline-block; }
   .side-foot { display: none; }
@@ -2157,7 +2169,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   <div class="side-brand">BOSSA<span>Sunningdale &middot; Bar stock</span></div>
   <nav class="side-nav">
     <button type="button" class="prim active" data-section="stock">Stock<span class="side-count">{tracked_count}</span></button>
-    <button type="button" class="prim" data-section="orders">Orders<span class="side-count side-count-hot">{total_order}</span></button>
+    <button type="button" class="prim prim-group" data-section="orders" aria-expanded="false"><span class="prim-name">Orders</span><span class="side-count side-count-hot">{total_order}</span><span class="prim-chev" aria-hidden="true"></span></button>
     <div class="side-sub" data-section="orders" hidden>
       <button type="button" class="tab-btn side-sub-link" data-tab="orders">Today&#x27;s order</button>
       <button type="button" class="tab-btn side-sub-link" data-tab="stock-order">Review &amp; send</button>
@@ -2273,10 +2285,14 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       if (g.dataset.section === section) g.removeAttribute('hidden');
       else                                g.setAttribute('hidden', '');
     }});
-    document.querySelectorAll('.side-sub').forEach(s => {{
-      if (s.dataset.section === section) s.removeAttribute('hidden');
-      else                                s.setAttribute('hidden', '');
-    }});
+  }}
+
+  // Orders is a collapsible sidebar group; this owns its expand/collapse state.
+  function setOrdersExpanded(expanded) {{
+    const grp = document.querySelector('.prim-group[data-section="orders"]');
+    const sub = document.querySelector('.side-sub[data-section="orders"]');
+    if (grp) {{ grp.classList.toggle('expanded', expanded); grp.setAttribute('aria-expanded', expanded ? 'true' : 'false'); }}
+    if (sub) sub.toggleAttribute('hidden', !expanded);
   }}
 
   function goToTab(name) {{
@@ -2287,6 +2303,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     if (pane) pane.classList.add('active');
     const section = TAB_SECTION[name];
     if (section) setActiveSection(section);
+    setOrdersExpanded(section === 'orders');
     updateSearchVisibility();
     applyFilter();
     if (name === 'stock-order') renderBatchPanel();
@@ -2326,6 +2343,15 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   // Primary nav clicks reveal that section's chip group and activate its first chip.
   document.querySelectorAll('.prim').forEach(p => {{
     p.addEventListener('click', () => {{
+      // Orders is a collapsible group on desktop: its button only toggles the
+      // sub-menu (navigation happens via the .side-sub-link sub-links). On the
+      // mobile layout the sub-menu is display:none and the secondary chip-nav is
+      // used instead, so there fall through to the normal navigate behaviour.
+      const mobile = window.matchMedia('(max-width: 640px)').matches;
+      if (p.classList.contains('prim-group') && !mobile) {{
+        setOrdersExpanded(!p.classList.contains('expanded'));
+        return;
+      }}
       const section = p.dataset.section;
       setActiveSection(section);
       const firstChip = document.querySelector('.chip-group[data-section="' + section + '"] .tab-btn');
