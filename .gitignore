@@ -4,6 +4,10 @@ __pycache__/
 *.pyo
 .env
 
+# Node (Netlify Functions deps — installed by Netlify / CI, never committed)
+node_modules/
+package-lock.json
+
 # Mac
 .DS_Store
 

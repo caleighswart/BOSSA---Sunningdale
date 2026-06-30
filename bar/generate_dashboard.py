@@ -291,7 +291,19 @@ def _grouped_missing_par(names: list) -> str:
     parts = []
     for label in sorted(groups.keys(), key=lambda x: x.lower()):
         items = sorted(groups[label], key=lambda x: x.lower())
-        lis = "".join(f"<li>{escape(n)}</li>" for n in items)
+        lis = "".join(
+            # data-product carries the raw pars.json key (what the build-time
+            # merge looks up); the label shows the tidied name. The manager
+            # types a par here and saves it via savePar() -> /api/set-par.
+            '<li class="par-edit" data-product="{key}">'
+            '<span class="par-edit-name">{name}</span>'
+            '<input type="number" min="0" step="1" inputmode="numeric" '
+            'class="par-input" aria-label="Par level for {name}">'
+            '<button type="button" class="par-save-btn" onclick="savePar(this)">Save</button>'
+            '<span class="par-edit-state" aria-live="polite"></span>'
+            '</li>'.format(key=escape(n), name=escape(_nice(n)))
+            for n in items
+        )
         parts.append(
             _cat_section(label, len(items),
                          f'<ul class="admin-list">{lis}</ul>')
@@ -1237,6 +1249,57 @@ body {
 .admin-list li:last-child { border-bottom: none; }
 .admin-list li.more { color: var(--ink-mute); font-style: italic; }
 
+/* Editable missing-par rows: name + par input + save + status. */
+.admin-list li.par-edit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.par-edit-name { flex: 1 1 auto; min-width: 0; }
+.par-input {
+  flex: 0 0 88px;
+  width: 88px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: right;
+  padding: 5px 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--bg-soft);
+  transition: border-color .12s, box-shadow .12s;
+}
+.par-input:focus {
+  outline: none;
+  border-color: var(--action);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+  background: var(--panel);
+}
+.par-save-btn {
+  flex: 0 0 auto;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--action);
+  border: 0;
+  border-radius: var(--radius-s);
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.par-save-btn:hover { background: var(--action-hover); }
+.par-save-btn:disabled { opacity: .55; cursor: default; }
+.par-edit-state {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 0;
+}
+.par-edit-state.is-saved { color: var(--ok); }
+.par-edit-state.is-error { color: var(--crit); }
+
 .empty {
   text-align: center;
   padding: 52px 20px;
@@ -2106,7 +2169,9 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
         admin_html += (
             f'<h3 class="section-title">Missing par levels '
             f'<span class="badge badge-warn">{len(missing_par)}</span></h3>'
-            f'<p class="admin-note">Set par values in <code>bar/pars.json</code> for these products:</p>'
+            f'<p class="admin-note">Enter the par level for each product below and press '
+            f'<strong>Save</strong> — it applies on the next dashboard refresh '
+            f'(tonight’s run, or trigger the daily workflow now to apply immediately).</p>'
             f'{_grouped_missing_par(missing_par)}'
         )
 
@@ -2309,6 +2374,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     applyFilter();
     if (name === 'stock-order') renderBatchPanel();
     if (name === 'history')     {{ renderHistory(); syncRemoteStatus(); }}
+    if (name === 'admin')       {{ fetchParOverrides(); }}
     paintSteppers();
   }}
 
@@ -3170,6 +3236,90 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       .catch(() => {{}});
   }}
 
+  // ── Admin: fill in missing par levels ─────────────────────────
+  // Pull any pars a manager already saved (Netlify Blobs via the Function) and
+  // reflect them back into the matching inputs. The saved par takes full effect
+  // on the next build (merge_par_overrides.mjs writes it into pars.json); here we
+  // just show it so the manager sees their entry persisted across reloads.
+  function fetchParOverrides() {{
+    if (!document.querySelector('.par-edit')) return;
+    fetch(location.origin + '/api/par-overrides', {{cache: 'no-store'}})
+      .then(r => r.ok ? r.json() : null)
+      .then(remote => {{
+        if (!remote) return;
+        document.querySelectorAll('.par-edit').forEach(li => {{
+          const product = li.dataset.product;
+          if (!(product in remote)) return;
+          const val = remote[product];
+          if (val === null || val === undefined) return;
+          const input = li.querySelector('.par-input');
+          const state = li.querySelector('.par-edit-state');
+          if (input && !input.value) input.value = val;
+          if (state) {{
+            state.textContent = 'Saved — applies on next refresh';
+            state.classList.add('is-saved');
+            state.classList.remove('is-error');
+          }}
+        }});
+      }})
+      .catch(() => {{}});
+  }}
+
+  function savePar(btn) {{
+    const li = btn.closest('.par-edit');
+    if (!li) return;
+    const product = li.dataset.product;
+    const input = li.querySelector('.par-input');
+    const state = li.querySelector('.par-edit-state');
+    const raw = (input.value || '').trim();
+
+    let par = null;
+    if (raw !== '') {{
+      par = Number(raw);
+      if (!Number.isFinite(par) || par < 0) {{
+        if (state) {{
+          state.textContent = 'Enter a number 0 or more';
+          state.classList.add('is-error');
+          state.classList.remove('is-saved');
+        }}
+        return;
+      }}
+    }}
+
+    btn.disabled = true;
+    if (state) {{
+      state.textContent = 'Saving…';
+      state.classList.remove('is-error', 'is-saved');
+    }}
+
+    fetch(location.origin + '/api/set-par', {{
+      method: 'POST',
+      headers: {{'Content-Type': 'application/json'}},
+      body: JSON.stringify({{product: product, par: par}})
+    }})
+      .then(r => {{
+        if (!r.ok) throw new Error('save failed');
+        return r.json();
+      }})
+      .then(() => {{
+        if (state) {{
+          state.textContent = par === null
+            ? 'Cleared — applies on next refresh'
+            : 'Saved — applies on next refresh';
+          state.classList.add('is-saved');
+          state.classList.remove('is-error');
+        }}
+      }})
+      .catch(() => {{
+        if (state) {{
+          state.textContent = 'Couldn’t save — try again';
+          state.classList.add('is-error');
+          state.classList.remove('is-saved');
+        }}
+      }})
+      .finally(() => {{ btn.disabled = false; }});
+  }}
+
   function updateOrderField(id, patch) {{
     const all = loadOrders();
     const idx = all.findIndex(o => o.id === id);
@@ -3350,6 +3500,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
   updateHistoryBadge();
   renderHistory();
   syncRemoteStatus();
+  fetchParOverrides();
 </script>
 
 </body>
