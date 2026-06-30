@@ -35,6 +35,22 @@ jobs:
       - name: Install dependencies
         run: pip install -r bar/requirements.txt
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # Apply any par levels managers entered on the dashboard Admin tab BEFORE
+      # generating, so generate_dashboard.py picks them up from pars.json. No-ops
+      # safely if the Netlify secrets aren't set (see merge_par_overrides.mjs).
+      - name: Merge par overrides into pars.json
+        env:
+          NETLIFY_API_TOKEN: ${{ secrets.NETLIFY_API_TOKEN }}
+          NETLIFY_SITE_ID:   ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          npm ci --omit=dev || npm install --omit=dev
+          node bar/merge_par_overrides.mjs
+
       - name: Test SSRS connection
         continue-on-error: true
         env:
@@ -81,13 +97,42 @@ jobs:
           echo "✅ dashboard-generated marker present."
 
       - name: Commit dashboard for Netlify deploy
+        env:
+          NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/index.html
+          # Stage the dashboard and pars.json (the latter changes only when a
+          # manager entered a new par via the Admin tab — merged in above).
+          git add docs/index.html bar/pars.json
           if git diff --cached --quiet; then
             echo "Dashboard unchanged — nothing to commit."
           else
             git commit -m "chore: update bar stock dashboard"
             git push
+            # Belt-and-suspenders: explicitly tell Netlify to deploy this push.
+            # Netlify's Git auto-deploy silently stalled on 2026-06-22 — the repo
+            # stayed fresh but the live site went stale for days. A build hook
+            # forces a deploy from latest main independent of the Git webhook.
+            # Degrades gracefully if the secret isn't set yet (Git auto-deploy only).
+            if [ -n "$NETLIFY_BUILD_HOOK_URL" ]; then
+              echo "Triggering Netlify build hook..."
+              curl -fsS -X POST -d '{}' "$NETLIFY_BUILD_HOOK_URL" \
+                && echo "✅ Netlify deploy triggered." \
+                || echo "::warning::Netlify build hook POST failed — check the deploy in the Netlify dashboard."
+            else
+              echo "::warning::NETLIFY_BUILD_HOOK_URL not set — relying on Netlify Git auto-deploy only."
+            fi
           fi
+
+      # Clear consumed par overrides LAST — only reached when every prior step
+      # (merge, generate, commit/push) succeeded, so the merged pars.json is
+      # safely on origin/main before any override is deleted. If an earlier step
+      # fails, this is skipped and the override stays in Blobs to re-apply next
+      # run, so a mid-run failure never drops a manager's edit. Deletes only
+      # overrides whose value is now reflected in pars.json.
+      - name: Clear consumed par overrides
+        env:
+          NETLIFY_API_TOKEN: ${{ secrets.NETLIFY_API_TOKEN }}
+          NETLIFY_SITE_ID:   ${{ secrets.NETLIFY_SITE_ID }}
+        run: node bar/merge_par_overrides.mjs --clear
