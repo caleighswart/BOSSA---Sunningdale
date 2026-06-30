@@ -2,10 +2,15 @@
   publish = "docs"
   command = ""
 
-# Serverless endpoints for the order confirm-receipt flow.
-# The functions self-register their clean URLs via `export const config =
-# { path: ... }` (Functions v2): confirm.mjs → /confirm, order-status.mjs →
-# /api/order-status. Both are same-origin, so the dashboard needs no CORS.
+# Serverless endpoints for the order confirm-receipt flow + par editing + the
+# UD order-schedule builder. The functions self-register their clean URLs via
+# `export const config = { path: ... }` (Functions v2): confirm.mjs → /confirm,
+# order-status.mjs → /api/order-status, set-par.mjs → /api/set-par,
+# par-overrides.mjs → /api/par-overrides, order-xlsx.mjs → /api/order-xlsx.
+# All same-origin, so the dashboard needs no CORS.
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # order-xlsx.mjs reads the committed UD catalogue template at runtime; bundle
+  # it alongside the function so it resolves in the deployed Lambda.
+  included_files = ["bar/ud_order_template.xlsx"]

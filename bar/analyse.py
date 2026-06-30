@@ -135,7 +135,9 @@ def analyse(rows: list[dict]) -> dict:
         bucket = by_cat.setdefault(r["cat"], {
             "critical": [], "low": [], "healthy": [], "variance": [],
         })
-        item = {"name": r["name"], "soh": soh, "par": par, "pct": pct}
+        # par_key is the raw pars.json key (e.g. "be - black label"); the UD
+        # order-schedule Excel is keyed on exactly these, so carry it through.
+        item = {"name": r["name"], "par_key": par_key, "soh": soh, "par": par, "pct": pct}
 
         if soh < VARIANCE_CUTOFF:
             bucket["variance"].append(item)
