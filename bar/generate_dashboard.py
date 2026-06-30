@@ -902,6 +902,7 @@ body {
   padding-left: 8px;
   border-left: 1px solid rgba(148,163,184,0.18);
 }
+.side-sub[hidden] { display: none; }
 .side-sub-link {
   display: block;
   text-align: left;
