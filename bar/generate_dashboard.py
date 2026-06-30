@@ -540,6 +540,7 @@ def _orders_tab(supplier_groups: list, day_str: str, today_iso: str) -> str:
                     f'<input type="checkbox" class="reorder-check" '
                     f'data-group="{group_id}" '
                     f'data-name="{name}" '
+                    f'data-par-key="{escape(item.get("par_key", ""))}" '
                     f'data-cat="{escape(_label)}" '
                     f'data-unit="{escape(unit)}" '
                     f'data-order-unit="{escape(order_unit)}" '
@@ -2842,6 +2843,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       }}
       groups.get(key).items.push({{
         name:      cb.dataset.name,
+        parKey:    cb.dataset.parKey || '',
         cat:       cb.dataset.cat,
         unit:      cb.dataset.unit,
         orderUnit: cb.dataset.orderUnit || cb.dataset.unit,
@@ -3076,43 +3078,37 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
       }} catch (err) {{}}
     }}
 
-    const greeting = g.contact ? 'Hi ' + g.contact : 'Hi';
-    let body = greeting + ',\\n\\n';
-    body += 'Please can we order the following:\\n\\n';
-    // Group items by category in first-seen order so the supplier sees a
-    // tidy list with WINE/BEER/WHISKEY headings, not a flat dump.
-    const byCat = new Map();
+    // \u2500\u2500 Build the UD order-schedule payload \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    // United Distributors require their order as a filled-in copy of their own
+    // Excel catalogue, not a text email body. POST the selected items to
+    // /api/order-xlsx, which fills the committed template (bar/ud_order_template
+    // .xlsx) and returns the .xlsx; the browser downloads it and we open a short
+    // email for the manager to attach it to and send. The order stays
+    // manager-reviewed (see CLAUDE.md order boundaries). Falls back to the
+    // legacy plain-text email if the function is unreachable (not yet deployed
+    // / offline) so a manager is never blocked.
+    const greeting  = g.contact ? 'Hi ' + g.contact : 'Hi';
+    const xlsxItems = [];
+    const xlsxExtra = [];
     items.forEach(it => {{
-      const cat = (it.cat || 'OTHER').toUpperCase();
-      if (!byCat.has(cat)) byCat.set(cat, []);
-      byCat.get(cat).push(it);
+      if (it.parKey) {{
+        xlsxItems.push({{ key: it.parKey, qty: it.needed }});
+      }} else {{
+        // Ordered product with no template row (e.g. a brand-new SKU): the
+        // function appends these so nothing is silently dropped.
+        xlsxExtra.push({{
+          name: it.name, cat: it.cat || '',
+          unit: it.orderUnit || it.unit || '', qty: it.needed
+        }});
+      }}
     }});
-    byCat.forEach((catItems, cat) => {{
-      body += cat + '\\n';
-      catItems.forEach(it => {{
-        // Draught is ordered by the keg \u2014 spell out kegs + litre total.
-        const qtyStr = it.kegLitres
-          ? (it.needed + ' keg' + (it.needed === 1 ? '' : 's') + ' (' + (it.needed * it.kegLitres) + 'L)')
-          : it.needed;
-        body += '- ' + it.name + ' \u2014 ' + qtyStr + '\\n';
-      }});
-      body += '\\n';
-    }});
-    body += replyToBodyLine();
 
-    // Order id stays the local source-of-truth key for the saved order below.
-    // (The supplier confirm-receipt link was removed pending go-live with the
-    // real BOSSA + supplier email addresses; syncRemoteStatus stays inert but
-    // harmless until then.)
     const orderId = newOrderId();
-    body += '\\nThanks,\\nBossa Sunningdale';
+    const subject = 'Bossa Sunningdale order — ' + (g.supplier || 'supplier') +
+                    (dateNice ? ' — ' + dateNice : '');
 
-    const subject = 'Bossa Sunningdale order \u2014 ' + (g.supplier || 'supplier') +
-                    (dateNice ? ' \u2014 ' + dateNice : '');
-
-    // Persist the order locally before opening the mail client — the
-    // localStorage row is the source of truth; the optional Apps Script
-    // webhook gets a best-effort copy.
+    // Persist the order locally first — the localStorage row is the source
+    // of truth; the optional Apps Script webhook gets a best-effort copy.
     const order = {{
       id:             orderId,
       sent_at:        new Date().toISOString(),
@@ -3130,20 +3126,81 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     }};
     recordOrder(order);
 
-    const mailto = 'mailto:' + encodeURIComponent(g.email) +
-                   '?subject=' + encodeURIComponent(subject) +
-                   '&body='   + encodeURIComponent(body) +
-                   ccParam();
-    window.location.href = mailto;
-
     const conf = document.getElementById('batch-confirmation');
     const note = document.getElementById('batch-conf-note');
-    if (note) {{
-      note.textContent = 'Sent ' + items.length + ' item' + (items.length === 1 ? '' : 's') +
-                         ' to ' + (g.supplier || 'supplier') + ' (' + g.email + '). ' +
-                         'Check your email client and send.';
+    function showNote(msg) {{
+      if (note) note.textContent = msg;
+      if (conf) conf.hidden = false;
     }}
-    if (conf) conf.hidden = false;
+    function openMail(bodyText) {{
+      window.location.href = 'mailto:' + encodeURIComponent(g.email) +
+                             '?subject=' + encodeURIComponent(subject) +
+                             '&body='   + encodeURIComponent(bodyText) +
+                             ccParam();
+    }}
+
+    // Short covering email — the spreadsheet IS the order; the manager
+    // attaches the downloaded file and sends.
+    const attachBody = greeting + ',\\n\\n' +
+      'Please find this week\\'s order attached as a spreadsheet.\\n' +
+      replyToBodyLine() + '\\nThanks,\\nBossa Sunningdale';
+
+    // Legacy plain-text order, used only if the .xlsx build is unreachable.
+    function buildTextBody() {{
+      let body = greeting + ',\\n\\n';
+      body += 'Please can we order the following:\\n\\n';
+      const byCat = new Map();
+      items.forEach(it => {{
+        const cat = (it.cat || 'OTHER').toUpperCase();
+        if (!byCat.has(cat)) byCat.set(cat, []);
+        byCat.get(cat).push(it);
+      }});
+      byCat.forEach((catItems, cat) => {{
+        body += cat + '\\n';
+        catItems.forEach(it => {{
+          const qtyStr = it.kegLitres
+            ? (it.needed + ' keg' + (it.needed === 1 ? '' : 's') + ' (' + (it.needed * it.kegLitres) + 'L)')
+            : it.needed;
+          body += '- ' + it.name + ' — ' + qtyStr + '\\n';
+        }});
+        body += '\\n';
+      }});
+      body += replyToBodyLine() + '\\nThanks,\\nBossa Sunningdale';
+      return body;
+    }}
+
+    const fileName  = 'Bossa Sunningdale - ' + (dateRaw || 'order') + '.xlsx';
+    const sentCount = items.length;
+
+    fetch('/api/order-xlsx', {{
+      method: 'POST',
+      headers: {{ 'content-type': 'application/json' }},
+      body: JSON.stringify({{ order_date: dateRaw, items: xlsxItems, extra: xlsxExtra }})
+    }})
+      .then(resp => {{
+        if (!resp.ok) throw new Error('order-xlsx ' + resp.status);
+        return resp.blob();
+      }})
+      .then(blob => {{
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 4000);
+        openMail(attachBody);
+        showNote('Downloaded the order schedule (' + sentCount + ' item' +
+                 (sentCount === 1 ? '' : 's') + ') for ' + (g.supplier || 'supplier') +
+                 ' and opened an email — attach “' + fileName + '” and send.');
+      }})
+      .catch(() => {{
+        // Function not deployed / offline — don't block the manager.
+        openMail(buildTextBody());
+        showNote('Couldn\\'t build the spreadsheet — opened a plain-text order ' +
+                 'email instead. Check your email client and send.');
+      }});
   }}
 
   // ── Order history (localStorage + optional webhook sync) ──────

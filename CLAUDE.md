@@ -88,6 +88,8 @@ bar/
   pilotfetch.py         — SSRS fetch
   config.py             — Categories, thresholds, suppliers
   pars.json             — 400 product → par mapping (from Sava's count sheet)
+  ud_order_template.xlsx — UD's blank order catalogue (Col A = pars key, Col B = unit);
+                           filled by order-xlsx.mjs into the order schedule UD requires
   main.py               — DORMANT: old Telegram-send entrypoint (no longer run)
   requirements.txt
 
@@ -102,9 +104,11 @@ netlify/functions/       — Serverless endpoints (order confirm-receipt + par e
   order-status.mjs       — JSON read-back of confirmations for the dashboard (GET /api/order-status)
   set-par.mjs            — Manager fills a missing par (POST /api/set-par → Netlify Blobs)
   par-overrides.mjs      — JSON read-back of saved pars for the dashboard (GET /api/par-overrides)
+  order-xlsx.mjs         — Builds UD's order schedule: fills bar/ud_order_template.xlsx from the
+                           batch order (POST /api/order-xlsx → .xlsx download). Uses ExcelJS.
 bar/merge_par_overrides.mjs — Build-time merge of saved pars into pars.json (+ --clear mode)
-netlify.toml            — Netlify config (publish=docs; functions dir)
-package.json            — @netlify/blobs dependency for the functions (repo's only Node code)
+netlify.toml            — Netlify config (publish=docs; functions dir; ud_order_template.xlsx in included_files)
+package.json            — @netlify/blobs + exceljs deps for the functions (repo's only Node code)
 
 PILOTLIVE_DATA_PULL.md  — Full SSRS technical reference
 CLAUDE.md               — This file
@@ -169,6 +173,7 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-06-28 | Addressed the *actual* Jun-outage failure mode: Netlify build-credit exhaustion had no early warning — it only surfaced as a 6-day live-site freeze. | Added a **build-credit monitor** to `health_check.yml` (commit `a1da67a`): polls the Netlify account's build-minute usage each run and warns *before* the quota runs out — ≥80% used → info issue (no email), ≥95% → hard failure (email). Account auto-discovered from the token (override via `NETLIFY_ACCOUNT_ID`). Optional + graceful: needs a Netlify PAT in `NETLIFY_API_TOKEN`; skipped silently if unset, and any monitoring-API error is logged but never fails the health check. **Still pending (manual, owner-only):** create the Netlify PAT and set `NETLIFY_API_TOKEN` to activate. Unlike the build-hook self-heal, this targets the failure mode that actually took the site down. |
 | 2026-06-28 | **Feature (manager request):** Orders → History showed status only via a manual dropdown the manager set by hand, and the date group headers were small/muted (11px, all-caps, grey). | (a) Restyled the History date headers — sentence-case, 14px/700, dark ink (on-brand vs. the old muted all-caps; uppercase reserved for ≤11px labels per the v3 design system). (b) Added a **confirm-receipt link** to every order email (`/confirm?id=<order-uuid>`). When the *supplier* clicks it and presses "Confirm receipt", a **Netlify Function** (`netlify/functions/confirm.mjs`) records it to **Netlify Blobs**; the dashboard polls `/api/order-status` (`order-status.mjs`) on load + History-tab open and auto-advances that order `sent → confirmed` (shows a "Confirmed <time>" line). **Two-step GET-page→POST** so email link-scanners can't auto-confirm. Keeps the manual mailto send + the dropdown as an override; stays inside the locked order boundaries (manager still sends/reviews; only the supplier's own click flips status). **No new secret** (Blobs is auto-authed in the Functions runtime). Adds the repo's first Node code (`package.json` → `@netlify/blobs`, `netlify/functions/`) but **no extra daily build** and negligible invocations — safe under the build-credit constraint. See "Order Confirm-Receipt" section below. |
 | 2026-06-30 | **Feature (manager request):** the Admin tab's "Missing par levels" list was read-only — the only way to set a par was to hand-edit `bar/pars.json` and commit, so the long-standing "fill in missing pars" TODO never moved. | Made each missing-par row **editable from the dashboard** (PR #27). The manager types a par + Save → a **Netlify Function** (`set-par.mjs`, `POST /api/set-par`) writes it to **Netlify Blobs** (store `par-overrides`); `par-overrides.mjs` (`GET /api/par-overrides`) reads saved values back so the inputs persist across reloads. The entered par becomes the **real** par: a new build-time Node step (`bar/merge_par_overrides.mjs`, run in `daily_bar.yml` **before** `generate_dashboard.py`) merges overrides into `pars.json` (only keys already on the sheet — junk-safe), so on the next refresh the product leaves the missing list and drives classification/orders/KPIs. `daily_bar.yml` also commits `pars.json` and clears consumed overrides **only after a successful push** (a mid-run failure never drops an edit — it re-applies next run). Stays inside the locked order boundaries (pars ≠ the display-only prep sheet; orders still manager-reviewed, so an errant par is caught at the order gate). **Latency:** a saved par applies on the next dashboard build, not instantly — UI says "applies on next refresh". **Still pending (manual, owner-only):** set `NETLIFY_API_TOKEN` (already pending for the build-credit monitor) **+ `NETLIFY_SITE_ID`** — until both exist the merge no-ops, so saving works but pars stay inert (CI warns, never fails). The merge step never fails the daily build. See "Admin par editing" section below. |
+| 2026-06-30 | **Feature (manager request):** UD (United Distributors) require orders as a filled-in copy of their own Excel catalogue, not a plain-text email body. The Orders tab's "Send batch via email" button only produced a `mailto:` with the order typed into the body. | Made the button build **UD's actual `.xlsx` schedule**. Committed the manager's UD catalogue as a blank template (`bar/ud_order_template.xlsx` — sample quantities/date cleared; full ~370-row product list + per-product units + styling preserved). `sendBatchGroup()` now POSTs the batch order (`{ key, qty }` pairs, where `key` is the `pars.json` product name carried end-to-end as `data-par-key` — sourced from a new `par_key` field in `analyse.py`) to a **Netlify Function** (`order-xlsx.mjs`, `POST /api/order-xlsx`, uses **ExcelJS**). The function fills **Col C** on every template row whose **Col A** matches, writes the date into D2, appends any off-catalogue SKUs under "Additional items", and returns the `.xlsx`. The dashboard **downloads** it and opens a **short** covering email to UD (manager CC'd) for the manager to **attach and send** — stays manager-reviewed (locked order boundaries). **No new secret** (pure transform; template bundled via `included_files`). **No extra daily build**, negligible invocations — build-credit safe. **Graceful fallback** to the legacy plain-text email if the function is unreachable. Ships working on the next Netlify deploy. See "UD order schedule" section below. |
 
 ---
 
@@ -268,6 +273,53 @@ installs `@netlify/blobs`. Nothing to configure. Until then the dashboard degrad
 **Verify locally** with `netlify dev` (needs the Netlify CLI + site linked): visit
 `http://localhost:8888/confirm?id=test-123`, click **Confirm receipt**, then load
 `http://localhost:8888/api/order-status` and confirm `test-123` shows `confirmed`.
+
+---
+
+## UD order schedule (Excel, not an email body)
+
+Shipped 2026-06-30. United Distributors (UD) — the single supplier all 18 categories route to
+(`config.py`) — require orders as a **filled-in copy of their own Excel catalogue**, not a
+plain-text email body. The Orders tab's **Send batch via email** button now produces that `.xlsx`.
+
+Flow:
+1. Manager builds the batch order on the Place-order tab and clicks the send button. `sendBatchGroup()`
+   (in `generate_dashboard.py`) collects the selected items as `{ key, qty }` pairs — `key` is the raw
+   `pars.json` product name, carried end-to-end as `data-par-key` on each order row (sourced from
+   `analyse.py`, which now surfaces `par_key`).
+2. It POSTs `{ order_date, items, extra }` to **`netlify/functions/order-xlsx.mjs`**
+   (`POST /api/order-xlsx`). The function loads the committed blank template
+   **`bar/ud_order_template.xlsx`**, writes the date into D2, and fills **Col C (quantity)** on every
+   row whose **Col A** product key matches an item. Ordered SKUs with no template row (`extra`, e.g. a
+   brand-new vape) are appended under a trailing "Additional items" block so nothing is dropped. It
+   returns the `.xlsx` as an attachment download.
+3. The browser **downloads** the file and opens a **short** pre-filled email to UD ("Please find this
+   week's order attached as a spreadsheet"), manager CC'd. The manager **attaches the downloaded file
+   and sends** — the order stays manager-reviewed (locked order boundaries).
+
+Design notes / boundaries:
+- **`bar/ud_order_template.xlsx`** is the example UD file with the sample quantities + date cleared —
+  a reusable blank form. The full ~370-row catalogue, per-product **units** (Col B: `Case`/`Bot`/`50L`
+  …, which exist nowhere else in the repo), category headers, fonts and column widths are preserved
+  byte-for-byte. To change UD's product list/units, edit this file.
+- **Server-side build, not an inline JS library** — keeps `docs/index.html` lean and gives
+  byte-faithful format fidelity (it edits the real template). Mirrors the existing functions pattern;
+  self-registers its clean path via `export const config = { path }` (Functions v2), same-origin (no
+  CORS). **No new secret** — pure transform, no Blobs/token. The template ships with the bundle via
+  `included_files` in `netlify.toml`. Adds `exceljs` to `package.json`.
+- **Build-credit safe** — no extra daily build, negligible invocations (only on a manager click).
+- **Graceful fallback** — if `/api/order-xlsx` is unreachable (function not yet deployed / offline),
+  the button falls back to the legacy plain-text order email so a manager is never blocked.
+- **Latency:** none — the file is built and downloaded on click (unlike par edits, which apply next build).
+
+**Activation:** ships working on the next Netlify deploy (auto-detects `netlify/functions/`, installs
+`exceljs`, bundles the template). Nothing to configure — no secret.
+
+**Verify locally** with `netlify dev`: build a batch order on the dashboard, click **Send batch via
+email** → a `.xlsx` downloads with the on-screen quantities filled on the right rows (and D2 = the
+order date) and a short email draft opens. Or hit the function directly:
+`curl -X POST localhost:8888/api/order-xlsx -H 'content-type: application/json' -d '{"order_date":"2026-06-27","items":[{"key":"be - black label","qty":1},{"key":"dr - castle lite draught","qty":2}],"extra":[]}' -o out.xlsx`
+then open `out.xlsx`.
 
 ---
 

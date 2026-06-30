@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Netlify Functions for the Bossa Sunningdale bar dashboard — supplier order confirm-receipt flow (confirm.mjs + order-status.mjs), backed by Netlify Blobs.",
+  "description": "Netlify Functions for the Bossa Sunningdale bar dashboard — supplier order confirm-receipt flow (confirm.mjs + order-status.mjs) backed by Netlify Blobs, and the UD order-schedule builder (order-xlsx.mjs) using ExcelJS.",
   "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+    "@netlify/blobs": "^8.1.0",
+    "exceljs": "^4.4.0"
   }
 }
