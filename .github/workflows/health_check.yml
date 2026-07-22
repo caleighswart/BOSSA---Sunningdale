@@ -269,6 +269,12 @@ jobs:
                                   usage + " Heads-up to watch usage before the billing "
                                   "period resets."
                               )
+                      else:
+                          # Endpoint reachable but no included-minute quota reported —
+                          # print what we got so the monitor stays observable.
+                          print(f"ℹ️  Netlify usage: {used:.0f} min used this period; "
+                                f"included-minute quota not reported by the API "
+                                f"(minutes keys: {sorted(mins.keys())}).")
               except Exception as e:
                   print(f"ℹ️  Could not check Netlify build usage: {e}")
 
