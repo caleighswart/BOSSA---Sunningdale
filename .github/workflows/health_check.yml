@@ -58,6 +58,7 @@ jobs:
           NETLIFY_BUILD_HOOK_URL: ${{ secrets.NETLIFY_BUILD_HOOK_URL }}
           NETLIFY_API_TOKEN:      ${{ secrets.NETLIFY_API_TOKEN }}
           NETLIFY_ACCOUNT_ID:     ${{ secrets.NETLIFY_ACCOUNT_ID }}
+          NETLIFY_MINUTES_LIMIT:  ${{ secrets.NETLIFY_MINUTES_LIMIT }}
         run: |
           python3 - <<'EOF'
           import json
@@ -263,33 +264,34 @@ jobs:
                       print(f"ℹ️  Netlify account resolved: {account_slug}")
                       mins = (netlify_get(f"{account_slug}/builds/status")
                               .get("minutes", {}) or {})
-                      used     = float(mins.get("current", 0) or 0)
-                      included = float(mins.get("included_minutes_with_packs")
-                                       or mins.get("included_minutes", 0) or 0)
-                      if included > 0:
-                          pct = used / included * 100
-                          print(f"ℹ️  Netlify build minutes: {used:.0f}/{included:.0f} "
-                                f"({pct:.0f}%) this period.")
-                          usage = (f"Netlify build minutes at **{pct:.0f}%** "
-                                   f"({used:.0f}/{included:.0f} used this period). "
-                                   "At 100% Netlify suspends all deploys and the live "
-                                   "dashboard freezes — this caused the Jun 2026 outage.")
-                          if pct >= 95:
-                              problems.append(
-                                  usage + " **Imminent** — cut deploy frequency or "
-                                  "raise the quota now."
-                              )
-                          elif pct >= 80:
-                              warnings.append(
-                                  usage + " Heads-up to watch usage before the billing "
-                                  "period resets."
-                              )
-                      else:
-                          # Endpoint reachable but no included-minute quota reported —
-                          # print what we got so the monitor stays observable.
-                          print(f"ℹ️  Netlify usage: {used:.0f} min used this period; "
-                                f"included-minute quota not reported by the API "
-                                f"(minutes keys: {sorted(mins.keys())}).")
+                      used = float(mins.get("current", 0) or 0)
+                      # Netlify returns 0 for this account's included minutes, so fall
+                      # back to a configured monthly allowance. Free/Starter = 300; add
+                      # 500 per purchased build-minute pack. Override the default by
+                      # setting the NETLIFY_MINUTES_LIMIT secret to your real allowance.
+                      limit = float(mins.get("included_minutes_with_packs")
+                                    or mins.get("included_minutes", 0) or 0)
+                      limit_src = "Netlify API"
+                      if limit <= 0:
+                          limit = float(os.environ.get("NETLIFY_MINUTES_LIMIT", "300") or 300)
+                          limit_src = "configured allowance"
+                      pct = used / limit * 100
+                      print(f"ℹ️  Netlify build minutes: {used:.0f}/{limit:.0f} "
+                            f"({pct:.0f}%) this period [{limit_src}].")
+                      usage = (f"Netlify build minutes at **{pct:.0f}%** "
+                               f"({used:.0f}/{limit:.0f} used this period). "
+                               "At 100% Netlify suspends all deploys and the live "
+                               "dashboard freezes — this caused the Jun 2026 outage.")
+                      if pct >= 95:
+                          problems.append(
+                              usage + " **Imminent** — cut deploy frequency or "
+                              "raise the quota now."
+                          )
+                      elif pct >= 80:
+                          warnings.append(
+                              usage + " Heads-up to watch usage before the billing "
+                              "period resets."
+                          )
               except Exception as e:
                   print(f"ℹ️  Could not check Netlify build usage: {e}")
 
