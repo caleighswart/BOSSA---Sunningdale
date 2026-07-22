@@ -174,6 +174,7 @@ GitHub Actions UI → workflow → "Run workflow" → main → run. Takes ~1m 15
 | 2026-06-28 | **Feature (manager request):** Orders → History showed status only via a manual dropdown the manager set by hand, and the date group headers were small/muted (11px, all-caps, grey). | (a) Restyled the History date headers — sentence-case, 14px/700, dark ink (on-brand vs. the old muted all-caps; uppercase reserved for ≤11px labels per the v3 design system). (b) Added a **confirm-receipt link** to every order email (`/confirm?id=<order-uuid>`). When the *supplier* clicks it and presses "Confirm receipt", a **Netlify Function** (`netlify/functions/confirm.mjs`) records it to **Netlify Blobs**; the dashboard polls `/api/order-status` (`order-status.mjs`) on load + History-tab open and auto-advances that order `sent → confirmed` (shows a "Confirmed <time>" line). **Two-step GET-page→POST** so email link-scanners can't auto-confirm. Keeps the manual mailto send + the dropdown as an override; stays inside the locked order boundaries (manager still sends/reviews; only the supplier's own click flips status). **No new secret** (Blobs is auto-authed in the Functions runtime). Adds the repo's first Node code (`package.json` → `@netlify/blobs`, `netlify/functions/`) but **no extra daily build** and negligible invocations — safe under the build-credit constraint. See "Order Confirm-Receipt" section below. |
 | 2026-06-30 | **Feature (manager request):** the Admin tab's "Missing par levels" list was read-only — the only way to set a par was to hand-edit `bar/pars.json` and commit, so the long-standing "fill in missing pars" TODO never moved. | Made each missing-par row **editable from the dashboard** (PR #27). The manager types a par + Save → a **Netlify Function** (`set-par.mjs`, `POST /api/set-par`) writes it to **Netlify Blobs** (store `par-overrides`); `par-overrides.mjs` (`GET /api/par-overrides`) reads saved values back so the inputs persist across reloads. The entered par becomes the **real** par: a new build-time Node step (`bar/merge_par_overrides.mjs`, run in `daily_bar.yml` **before** `generate_dashboard.py`) merges overrides into `pars.json` (only keys already on the sheet — junk-safe), so on the next refresh the product leaves the missing list and drives classification/orders/KPIs. `daily_bar.yml` also commits `pars.json` and clears consumed overrides **only after a successful push** (a mid-run failure never drops an edit — it re-applies next run). Stays inside the locked order boundaries (pars ≠ the display-only prep sheet; orders still manager-reviewed, so an errant par is caught at the order gate). **Latency:** a saved par applies on the next dashboard build, not instantly — UI says "applies on next refresh". **Still pending (manual, owner-only):** set `NETLIFY_API_TOKEN` (already pending for the build-credit monitor) **+ `NETLIFY_SITE_ID`** — until both exist the merge no-ops, so saving works but pars stay inert (CI warns, never fails). The merge step never fails the daily build. See "Admin par editing" section below. |
 | 2026-06-30 | **Feature (manager request):** UD (United Distributors) require orders as a filled-in copy of their own Excel catalogue, not a plain-text email body. The Orders tab's "Send batch via email" button only produced a `mailto:` with the order typed into the body. | Made the button build **UD's actual `.xlsx` schedule**. Committed the manager's UD catalogue as a blank template (`bar/ud_order_template.xlsx` — sample quantities/date cleared; full ~370-row product list + per-product units + styling preserved). `sendBatchGroup()` now POSTs the batch order (`{ key, qty }` pairs, where `key` is the `pars.json` product name carried end-to-end as `data-par-key` — sourced from a new `par_key` field in `analyse.py`) to a **Netlify Function** (`order-xlsx.mjs`, `POST /api/order-xlsx`, uses **ExcelJS**). The function fills **Col C** on every template row whose **Col A** matches, writes the date into D2, appends any off-catalogue SKUs under "Additional items", and returns the `.xlsx`. The dashboard **downloads** it and opens a **short** covering email to UD (manager CC'd) for the manager to **attach and send** — stays manager-reviewed (locked order boundaries). **No new secret** (pure transform; template bundled via `included_files`). **No extra daily build**, negligible invocations — build-credit safe. **Graceful fallback** to the legacy plain-text email if the function is unreachable. Ships working on the next Netlify deploy. See "UD order schedule" section below. |
+| 2026-07-22 | **Bug (tester report):** the UD order email arrived at the supplier with **no spreadsheet attached and no item list** — orders were effectively going out empty. Root cause: a `mailto:` link **cannot carry a file attachment**, so the 2026-06-30 flow only *downloaded* the `.xlsx` locally and relied on the manager remembering to manually attach it before sending. That manual step was missed (even in testing), and the covering email body deliberately lists no items (the spreadsheet is the order). Backend verified healthy — `/api/order-xlsx` fills the template correctly. | Owner chose **server-side send** (explicit new instruction, overriding the locked `mailto` boundary — the human *review* still holds). Added **`send-order.mjs`** (`POST /api/send-order`): builds the same `.xlsx` (extracted the fill logic into shared **`_ud_order.mjs`**, now used by both `order-xlsx.mjs` and the sender) and **emails it to UD with the file actually attached** via **Resend**, manager CC'd + reply-to, body/subject generated server-side (not an open relay). `sendBatchGroup()` now shows an on-screen **confirm** (review-before-send), POSTs to `/api/send-order`, and **falls back to the old download + `mailto`** on `503 not-configured` or any send error — so nothing regresses before setup. **Pending (owner-only):** set Netlify env vars `RESEND_API_KEY` + a verified `ORDER_FROM_EMAIL` (Resend needs domain verification); until then the send is inert and the manual-attach failure mode persists. The send-first `index.html` goes live on the next `daily_bar.yml` regen. See "UD order schedule" section. |
 
 ---
 
@@ -293,9 +294,15 @@ Flow:
    row whose **Col A** product key matches an item. Ordered SKUs with no template row (`extra`, e.g. a
    brand-new vape) are appended under a trailing "Additional items" block so nothing is dropped. It
    returns the `.xlsx` as an attachment download.
-3. The browser **downloads** the file and opens a **short** pre-filled email to UD ("Please find this
-   week's order attached as a spreadsheet"), manager CC'd. The manager **attaches the downloaded file
-   and sends** — the order stays manager-reviewed (locked order boundaries).
+3. **Server-side send (added 2026-07-22):** `sendBatchGroup()` first shows an on-screen **confirm**
+   ("Send this order to UD (N items)? To/CC …"), then POSTs the order to **`send-order.mjs`**
+   (`POST /api/send-order`), which builds the same `.xlsx` (shared `_ud_order.mjs`) and **emails it to
+   UD with the spreadsheet actually attached**, manager CC'd + reply-to, via **Resend**. The order
+   stays manager-reviewed — the manager reviews the batch and clicks Send; only the send *mechanism*
+   changed (a `mailto:` link **cannot** carry an attachment, which is why the old download-then-attach
+   flow was shipping orders with no spreadsheet). **Fallback:** if the sender isn't configured yet
+   (`503`) or the send fails, it silently degrades to the **old download + `mailto`** path so a manager
+   is never blocked.
 
 Design notes / boundaries:
 - **`bar/ud_order_template.xlsx`** is the example UD file with the sample quantities + date cleared —
@@ -312,12 +319,26 @@ Design notes / boundaries:
   the button falls back to the legacy plain-text order email so a manager is never blocked.
 - **Latency:** none — the file is built and downloaded on click (unlike par edits, which apply next build).
 
-**Activation:** ships working on the next Netlify deploy (auto-detects `netlify/functions/`, installs
-`exceljs`, bundles the template). Nothing to configure — no secret.
+**Activation:**
+- **Download/build path** — ships working on the next Netlify deploy (auto-detects `netlify/functions/`,
+  installs `exceljs`, bundles the template). Nothing to configure.
+- **Server-side send (owner-only, to make the email actually carry the attachment):** set two
+  **Netlify environment variables** (Netlify → Site settings → Environment variables — **NOT** GitHub
+  Secrets; the function runs in the Netlify Functions runtime):
+  - `RESEND_API_KEY` — a [Resend](https://resend.com) API key.
+  - `ORDER_FROM_EMAIL` — a **verified** sender on your Resend domain (e.g. `orders@<yourdomain>`).
+    Resend requires domain verification (DNS records) before it will deliver to arbitrary recipients.
+  - `ORDER_FROM_NAME` — optional display name (default `Bossa Sunningdale`).
+  Until both required vars are set, `/api/send-order` returns `503` and the dashboard **falls back to
+  the download + `mailto`** flow — so it degrades gracefully, exactly as before. **⚠️ Until this is
+  set, the manager must still manually attach the downloaded file** (the failure mode that prompted
+  this change). The new `index.html` (with the send-first button) only goes live once
+  `daily_bar.yml` regenerates it — trigger a manual run or wait for the morning cron.
 
 **Verify locally** with `netlify dev`: build a batch order on the dashboard, click **Send batch via
-email** → a `.xlsx` downloads with the on-screen quantities filled on the right rows (and D2 = the
-order date) and a short email draft opens. Or hit the function directly:
+email** → confirm the review dialog. With `RESEND_API_KEY`/`ORDER_FROM_EMAIL` set it sends via Resend;
+unset, it falls back to a `.xlsx` download with the on-screen quantities filled on the right rows (and
+D2 = the order date) and a short email draft opens. Or hit the function directly:
 `curl -X POST localhost:8888/api/order-xlsx -H 'content-type: application/json' -d '{"order_date":"2026-06-27","items":[{"key":"be - black label","qty":1},{"key":"dr - castle lite draught","qty":2}],"extra":[]}' -o out.xlsx`
 then open `out.xlsx`.
 

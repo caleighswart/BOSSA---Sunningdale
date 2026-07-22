@@ -3104,8 +3104,23 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     }});
 
     const orderId = newOrderId();
+    const mgrEmail = getManagerEmail();
     const subject = 'Bossa Sunningdale order — ' + (g.supplier || 'supplier') +
                     (dateNice ? ' — ' + dateNice : '');
+
+    // ── Review-before-send gate (locked order boundary) ─────────
+    // Server-side send actually dispatches the email, so it's irreversible —
+    // require an explicit on-screen confirm first. The manager has already
+    // reviewed the order by building the batch; this is the final "send it".
+    const confirmLines = [
+      'Send this order to ' + (g.supplier || 'the supplier') +
+        ' (' + items.length + ' item' + (items.length === 1 ? '' : 's') + ')?'
+    ];
+    if (g.email)  confirmLines.push('To: ' + g.email);
+    if (mgrEmail) confirmLines.push('CC: ' + mgrEmail);
+    confirmLines.push('');
+    confirmLines.push('The order spreadsheet will be attached automatically.');
+    if (!window.confirm(confirmLines.join('\\n'))) return;
 
     // Persist the order locally first — the localStorage row is the source
     // of truth; the optional Apps Script webhook gets a best-effort copy.
@@ -3140,7 +3155,7 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     }}
 
     // Short covering email — the spreadsheet IS the order; the manager
-    // attaches the downloaded file and sends.
+    // attaches the downloaded file and sends. (Fallback path only.)
     const attachBody = greeting + ',\\n\\n' +
       'Please find this week\\'s order attached as a spreadsheet.\\n' +
       replyToBodyLine() + '\\nThanks,\\nBossa Sunningdale';
@@ -3172,34 +3187,77 @@ def build_html(result: dict, brief_date: str, pilotlive_title: str) -> str:
     const fileName  = 'Bossa Sunningdale - ' + (dateRaw || 'order') + '.xlsx';
     const sentCount = items.length;
 
-    fetch('/api/order-xlsx', {{
+    // Fallback: build + download the .xlsx and open a mailto for the manager
+    // to attach and send. Used when server-side send isn't configured yet
+    // (503) or is unreachable — a manager is never blocked. `failed` = an
+    // actual send error (vs the expected "not configured yet") so the note can
+    // flag that no email went out automatically.
+    function downloadAndMailFallback(failed) {{
+      fetch('/api/order-xlsx', {{
+        method: 'POST',
+        headers: {{ 'content-type': 'application/json' }},
+        body: JSON.stringify({{ order_date: dateRaw, items: xlsxItems, extra: xlsxExtra }})
+      }})
+        .then(resp => {{
+          if (!resp.ok) throw new Error('order-xlsx ' + resp.status);
+          return resp.blob();
+        }})
+        .then(blob => {{
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 4000);
+          openMail(attachBody);
+          showNote((failed ? 'Automatic send failed — instead we ' : '') +
+                   'downloaded the order schedule (' + sentCount + ' item' +
+                   (sentCount === 1 ? '' : 's') + ') for ' + (g.supplier || 'supplier') +
+                   ' and opened an email — attach “' + fileName + '” and send.');
+        }})
+        .catch(() => {{
+          openMail(buildTextBody());
+          showNote('Couldn\\'t build the spreadsheet — opened a plain-text order ' +
+                   'email instead. Check your email client and send.');
+        }});
+    }}
+
+    // Primary: server-side send with the spreadsheet actually attached. A
+    // mailto: link can't carry an attachment, so this Netlify Function
+    // (send-order.mjs) emails the supplier directly, manager CC'd + reply-to.
+    fetch('/api/send-order', {{
       method: 'POST',
       headers: {{ 'content-type': 'application/json' }},
-      body: JSON.stringify({{ order_date: dateRaw, items: xlsxItems, extra: xlsxExtra }})
+      body: JSON.stringify({{
+        order_date: dateRaw,
+        to:         g.email,
+        cc:         mgrEmail,
+        reply_to:   mgrEmail,
+        contact:    g.contact || '',
+        date_nice:  dateNice,
+        items:      xlsxItems,
+        extra:      xlsxExtra
+      }})
     }})
       .then(resp => {{
-        if (!resp.ok) throw new Error('order-xlsx ' + resp.status);
-        return resp.blob();
+        // 503 = sender not configured yet → silent graceful fallback.
+        if (resp.status === 503) {{ downloadAndMailFallback(false); return null; }}
+        if (!resp.ok) throw new Error('send-order ' + resp.status);
+        return resp.json();
       }})
-      .then(blob => {{
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 4000);
-        openMail(attachBody);
-        showNote('Downloaded the order schedule (' + sentCount + ' item' +
-                 (sentCount === 1 ? '' : 's') + ') for ' + (g.supplier || 'supplier') +
-                 ' and opened an email — attach “' + fileName + '” and send.');
+      .then(res => {{
+        if (res === null) return; // fell back above
+        showNote('Sent the order to ' + (g.supplier || 'supplier') + ' — ' +
+                 sentCount + ' item' + (sentCount === 1 ? '' : 's') +
+                 ' with the spreadsheet attached' +
+                 (mgrEmail ? '; you\\'re CC\\'d.' : '.'));
       }})
       .catch(() => {{
-        // Function not deployed / offline — don't block the manager.
-        openMail(buildTextBody());
-        showNote('Couldn\\'t build the spreadsheet — opened a plain-text order ' +
-                 'email instead. Check your email client and send.');
+        // Real send error (provider/network) — fall back so the manager can
+        // still get the order out, and flag that auto-send didn't work.
+        downloadAndMailFallback(true);
       }});
   }}
 
