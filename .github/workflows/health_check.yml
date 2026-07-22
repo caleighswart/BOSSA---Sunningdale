@@ -238,7 +238,21 @@ jobs:
 
                   # Netlify's build-status endpoint is /{account_slug}/builds/status
                   # — no "accounts/" prefix, and keyed by the account *slug*, not id.
+                  # Resolve the account that actually OWNS the dashboard site: the token
+                  # may see several accounts and accounts[0] is arbitrary (often a near-
+                  # empty personal one reporting a 0 quota). Fall back to accounts[0]
+                  # only if the site lookup fails.
                   account_slug = os.environ.get("NETLIFY_ACCOUNT_ID", "")
+                  if not account_slug:
+                      host = os.environ.get("DASHBOARD_URL", "").split("//")[-1].split("/")[0]
+                      site_name = host.split(".")[0]
+                      try:
+                          for s in netlify_get(f"sites?name={site_name}"):
+                              if s.get("name") == site_name:
+                                  account_slug = s.get("account_slug") or ""
+                                  break
+                      except Exception:
+                          pass
                   if not account_slug:
                       accounts = netlify_get("accounts")
                       account_slug = (accounts[0].get("slug") or accounts[0].get("id")) if accounts else ""
@@ -246,6 +260,7 @@ jobs:
                   if not account_slug:
                       print("ℹ️  Netlify usage check: no account found for token.")
                   else:
+                      print(f"ℹ️  Netlify account resolved: {account_slug}")
                       mins = (netlify_get(f"{account_slug}/builds/status")
                               .get("minutes", {}) or {})
                       used     = float(mins.get("current", 0) or 0)
