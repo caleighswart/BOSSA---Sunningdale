@@ -24,3 +24,8 @@ bar/April 26 Stock Count This one.xlsx
 # Claude harness state
 .claude/
 bar/.claude/
+
+# Local working files / analysis artefacts (never commit — large or personal)
+Vouchers/
+Bar_Stock_Agent_Design_Decision.pdf
+bar/WhatsApp Audio*.opus

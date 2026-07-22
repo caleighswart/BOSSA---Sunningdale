@@ -1,0 +1,4 @@
+{
+  "_comment": "Front/back stock split shown as Back/Front columns in the dashboard's stock tabs (Critical, Low, Healthy, All products). PilotLive's feed only gives ONE combined total (SOH) per product, so the front (in-bar) vs back (storeroom) split is maintained here from the daily prep-sheet count. Keys = PilotLive product names (same format as pars.json). Values = {\"back\": <storeroom qty>, \"front\": <in-bar qty>}. Set _as_of to the count date. Example: \"be - amstel\": {\"back\": 24, \"front\": 11}. Products left out render blank (—) back/front; the SOH column stays live from PilotLive.",
+  "_as_of": null
+}
