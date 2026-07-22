@@ -236,15 +236,17 @@ jobs:
                       with urllib.request.urlopen(r, timeout=30) as resp:
                           return json.loads(resp.read().decode("utf-8", errors="ignore"))
 
-                  account_id = os.environ.get("NETLIFY_ACCOUNT_ID", "")
-                  if not account_id:
+                  # Netlify's build-status endpoint is /{account_slug}/builds/status
+                  # — no "accounts/" prefix, and keyed by the account *slug*, not id.
+                  account_slug = os.environ.get("NETLIFY_ACCOUNT_ID", "")
+                  if not account_slug:
                       accounts = netlify_get("accounts")
-                      account_id = accounts[0]["id"] if accounts else ""
+                      account_slug = (accounts[0].get("slug") or accounts[0].get("id")) if accounts else ""
 
-                  if not account_id:
+                  if not account_slug:
                       print("ℹ️  Netlify usage check: no account found for token.")
                   else:
-                      mins = (netlify_get(f"accounts/{account_id}/builds/status")
+                      mins = (netlify_get(f"{account_slug}/builds/status")
                               .get("minutes", {}) or {})
                       used     = float(mins.get("current", 0) or 0)
                       included = float(mins.get("included_minutes_with_packs")
