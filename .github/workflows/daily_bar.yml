@@ -1,4 +1,4 @@
-name: Bossa Sunningdale — Daily Bar Stock Dashboard
+name: Bossa Sunningdale — Daily Bar Stock Dashboard (paused)
 
 on:
   # Two scheduled runs per day, ~2h apart, to harden against GitHub Actions
@@ -8,9 +8,15 @@ on:
   #   Primary : 03:13 UTC = 05:13 SAST target (lands ~07:13–08:13 SAST)
   #   Backup  : 05:17 UTC = 07:17 SAST target (lands ~09:17–10:17 SAST)
   # If GitHub drops *both*, the 11:33 SAST health check auto-triggers a run.
-  schedule:
-    - cron: '13 3 * * *'
-    - cron: '17 5 * * *'
+  # ── PAUSED 2026-08-28 ─────────────────────────────────────────────────
+  # Project on hold — no daily refresh, no daily Netlify deploy, no daily
+  # PilotLive pull. Schedules commented out rather than deleted so re-enabling is
+  # a two-line uncomment. Manual trigger below still regenerates the dashboard
+  # on demand. Note: health_check.yml is paused too, so nothing will notice or
+  # auto-recover a stale dashboard while this is off.
+  # schedule:
+  #   - cron: '13 3 * * *'
+  #   - cron: '17 5 * * *'
 
   # Manual trigger from the Actions tab (for testing / recovery)
   workflow_dispatch:

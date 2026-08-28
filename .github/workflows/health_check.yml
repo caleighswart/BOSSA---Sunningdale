@@ -1,4 +1,4 @@
-name: Bossa Sunningdale — Daily Dashboard Health Check
+name: Bossa Sunningdale — Daily Dashboard Health Check (paused)
 
 # Verifies once a day that:
 #   1. daily_bar.yml has a successful run completed today (SAST), AND
@@ -33,10 +33,16 @@ name: Bossa Sunningdale — Daily Dashboard Health Check
 # cron delays. A second run on a healthy day just re-prints "Healthy" and exits 0;
 # same-title/same-date issue dedup prevents duplicate issues on a failing day.
 
+# ── PAUSED 2026-08-28 ─────────────────────────────────────────────────────
+# Project on hold. Once daily_bar.yml stops refreshing the dashboard, this check
+# would (correctly) fail every single day — opening a GitHub issue and sending a
+# failure email each time, the issues #9–#21 pattern from Jun 2026. Schedules are
+# commented out rather than deleted so re-enabling is a two-line uncomment.
+# Manual trigger retained for spot-checks.
 on:
-  schedule:
-    - cron: '33 9 * * *'    # 11:33 SAST — primary
-    - cron: '33 11 * * *'   # 13:33 SAST — backup, in case GitHub drops the primary cron
+  # schedule:
+  #   - cron: '33 9 * * *'    # 11:33 SAST — primary
+  #   - cron: '33 11 * * *'   # 13:33 SAST — backup, in case GitHub drops the primary cron
   workflow_dispatch:
 
 permissions:
